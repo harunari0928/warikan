@@ -14,11 +14,16 @@ test.describe('支出CRUD', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: '妻' }).waitFor();
 
+    // 各自が自分の手取りだけを入力する
     await page.getByRole('textbox', { name: '妻の手取り' }).fill('300000');
+    await page.getByRole('textbox', { name: '妻の手取り' }).blur();
+    await page.getByRole('tab', { name: '夫' }).click();
     await page.getByRole('textbox', { name: '夫の手取り' }).fill('400000');
     await page.getByRole('textbox', { name: '夫の手取り' }).blur();
     await expect(page.getByRole('region', { name: '月次サマリー' }).getByText('¥50,000')).toBeVisible();
 
+    // 妻として家賃の支出を追加する
+    await page.getByRole('tab', { name: '妻' }).click();
     await page.getByRole('button', { name: '支出を追加' }).click();
     await expect(page.getByRole('dialog', { name: '支出を追加' })).toBeVisible();
     await page.getByRole('textbox', { name: '説明' }).fill('家賃');

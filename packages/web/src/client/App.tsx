@@ -146,6 +146,7 @@ export default function App() {
             <SummaryCard
               snapshot={snapshot}
               users={users}
+              currentUserId={currentUserId}
               onIncomeChange={handleIncomeChange}
               onPaidChange={handlePaidChange}
             />

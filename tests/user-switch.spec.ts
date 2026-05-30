@@ -25,4 +25,17 @@ test.describe('ユーザ切替', () => {
     await page.reload();
     await expect(page.getByRole('tab', { name: '夫' })).toHaveAttribute('aria-selected', 'true');
   });
+
+  test('自分の手取りは編集でき、別ユーザの手取りは編集できない', async ({ page }) => {
+    await page.goto('/');
+
+    // 妻の表示では妻の手取りだけ編集でき、夫の手取りはロックされている
+    await expect(page.getByLabel('妻の手取り')).toBeEnabled();
+    await expect(page.getByLabel('夫の手取り')).toBeDisabled();
+
+    // 夫に切り替えると逆になる
+    await page.getByRole('tab', { name: '夫' }).click();
+    await expect(page.getByLabel('夫の手取り')).toBeEnabled();
+    await expect(page.getByLabel('妻の手取り')).toBeDisabled();
+  });
 });
