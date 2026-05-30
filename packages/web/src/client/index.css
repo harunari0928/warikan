@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Safe-area helpers for Pixel7a etc. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

@@ -1,0 +1,13 @@
+{
+  "users": [
+    { "name": "妻", "display_order": 0 },
+    { "name": "夫", "display_order": 1 }
+  ],
+  "fixed_expense_templates": [
+    { "user": "妻", "description": "家賃", "amount": 59000 },
+    { "user": "夫", "description": "通信費", "amount": 4180 },
+    { "user": "夫", "description": "電気代", "amount": 8000 },
+    { "user": "夫", "description": "ガス代", "amount": 7000 },
+    { "user": "妻", "description": "水道代", "amount": 5000 }
+  ]
+}
