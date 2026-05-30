@@ -14,7 +14,7 @@ export default function MonthSelector({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => onChange(shiftMonth(value, -1))}
-        className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200"
+        className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800 dark:active:bg-slate-700"
         aria-label="前の月"
       >
         ◀
@@ -26,7 +26,7 @@ export default function MonthSelector({ value, onChange }: Props) {
         type="button"
         onClick={() => onChange(shiftMonth(value, 1))}
         disabled={atCurrentMonth}
-        className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+        className="h-10 w-10 flex items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 dark:text-slate-200 dark:hover:bg-slate-800 dark:active:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
         aria-label="次の月"
       >
         ▶
