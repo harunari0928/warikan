@@ -1,6 +1,6 @@
 services:
   web:
-    image: harunari/warikan-web:latest
+    image: harunari/warikan:latest
     build:
       context: .
       dockerfile: packages/web/Dockerfile
