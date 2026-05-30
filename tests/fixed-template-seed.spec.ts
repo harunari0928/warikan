@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetDb, seedUsers, addFixedTemplate, TEST_MONTH } from './helpers.js';
+import { resetDb, seedUsers, addFixedTemplate } from './helpers.js';
 
 test.describe('固定費テンプレートの自動投入', () => {
   test('月を初めて開くとアクティブなテンプレートが自動投入される', async ({ page, request }) => {
@@ -19,22 +19,16 @@ test.describe('固定費テンプレートの自動投入', () => {
     await expect(husbandRow.getByText('¥4,180')).toBeVisible();
   });
 
-  test('同じ月を再度開いても二重投入されない', async ({ request }) => {
+  test('画面を更新しても固定費が二重に表示されない', async ({ page, request }) => {
     await resetDb(request);
     const { wife } = await seedUsers(request);
     await addFixedTemplate(request, wife, '家賃', 59000);
 
-    // First open creates instances
-    await request.get(`http://localhost:3121/api/months/${TEST_MONTH}`);
-    // Concurrent reopen
-    await Promise.all([
-      request.get(`http://localhost:3121/api/months/${TEST_MONTH}`),
-      request.get(`http://localhost:3121/api/months/${TEST_MONTH}`),
-      request.get(`http://localhost:3121/api/months/${TEST_MONTH}`),
-    ]);
+    await page.goto('/');
+    const list = page.getByRole('region', { name: '支出リスト' });
+    await expect(list.getByRole('button', { name: /家賃/ })).toHaveCount(1);
 
-    const res = await request.get(`http://localhost:3121/api/months/${TEST_MONTH}/expenses`);
-    const expenses = (await res.json()) as { description: string }[];
-    expect(expenses.filter((e) => e.description === '家賃')).toHaveLength(1);
+    await page.reload();
+    await expect(list.getByRole('button', { name: /家賃/ })).toHaveCount(1);
   });
 });

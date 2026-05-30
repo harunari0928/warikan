@@ -84,19 +84,35 @@ export default function SummaryCard({ snapshot, users, onIncomeChange, onPaidCha
             </span>
           </div>
         )}
-        <label className="flex items-center gap-2 text-sm select-none cursor-pointer">
+        <label
+          className={`flex items-center gap-2 text-sm select-none ${
+            month.is_closed ? 'cursor-pointer' : 'cursor-not-allowed'
+          }`}
+        >
           <input
             type="checkbox"
             checked={month.settlement_paid}
+            disabled={!month.is_closed}
             onChange={(e) => onPaidChange(e.target.checked)}
-            className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-40"
           />
-          <span className={month.settlement_paid ? 'text-emerald-700 font-medium' : 'text-slate-700'}>
+          <span
+            className={
+              !month.is_closed
+                ? 'text-slate-400'
+                : month.settlement_paid
+                  ? 'text-emerald-700 font-medium'
+                  : 'text-slate-700'
+            }
+          >
             精算済み
             {month.settlement_paid && month.settlement_paid_at
               ? ` (${month.settlement_paid_at.slice(5, 10).replace('-', '/')} 完了)`
               : ''}
           </span>
+          {!month.is_closed ? (
+            <span className="text-xs text-slate-400">（月を締めると操作できます）</span>
+          ) : null}
         </label>
       </div>
     </section>

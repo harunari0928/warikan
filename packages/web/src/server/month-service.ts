@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { isValidYearMonth, getNowISO, calculateSettlement } from '@warikan/shared';
+import { isValidYearMonth, getNowISO, calculateSettlement, getCurrentMonthJST } from '@warikan/shared';
 
 export type MonthRow = {
   id: number;
@@ -53,6 +53,11 @@ export type MonthSnapshot = {
 export function getOrCreateMonth(db: Database.Database, yearMonth: string): MonthRow {
   if (!isValidYearMonth(yearMonth)) {
     throw Object.assign(new Error('invalid year_month'), { httpStatus: 400 });
+  }
+
+  // 未来月（まだ到来していない月）はレコードを作成・取得させない
+  if (yearMonth > getCurrentMonthJST()) {
+    throw Object.assign(new Error('future month is not allowed'), { httpStatus: 400 });
   }
 
   const initialize = db.transaction((ym: string) => {
