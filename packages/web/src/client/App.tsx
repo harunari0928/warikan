@@ -8,6 +8,7 @@ import FixedTemplateAdmin from './components/FixedTemplateAdmin.js';
 import { useUsers } from './hooks/useUsers.js';
 import { useCurrentUser } from './hooks/useCurrentUser.js';
 import { useMonth } from './hooks/useMonth.js';
+import { useTheme } from './hooks/useTheme.js';
 import { getCurrentMonthLocal } from './utils.js';
 import type { Expense, MonthSnapshot } from './types.js';
 
@@ -27,6 +28,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
+  const { theme, toggleTheme } = useTheme();
   const { users } = useUsers();
   const { currentUserId, selectUser } = useCurrentUser(users);
   const { snapshot, setSnapshot, loading, error, refetch } = useMonth(yearMonth);
@@ -124,13 +126,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <Header
         yearMonth={yearMonth}
         onMonthChange={setYearMonth}
         users={users}
         currentUserId={currentUserId}
         onUserChange={selectUser}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         onOpenSettings={() => {
           window.location.hash = '#/templates';
         }}
@@ -138,9 +142,9 @@ export default function App() {
 
       <main className="px-4 py-4 space-y-4 pb-32 max-w-2xl mx-auto">
         {loading && !snapshot ? (
-          <div className="text-center text-slate-500 py-12 text-sm">読み込み中…</div>
+          <div className="text-center text-slate-500 dark:text-slate-400 py-12 text-sm">読み込み中…</div>
         ) : error ? (
-          <div className="rounded-xl bg-red-50 text-red-700 p-3 text-sm">エラー: {error}</div>
+          <div className="rounded-xl bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 p-3 text-sm">エラー: {error}</div>
         ) : snapshot ? (
           <>
             <SummaryCard
@@ -168,7 +172,7 @@ export default function App() {
               />
             </div>
             {users.length < 2 ? (
-              <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3">
+              <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-200 text-sm p-3">
                 ユーザーが2人未満です。設定からユーザーを追加してください（妻と夫の2人で利用します）。
               </div>
             ) : null}
@@ -184,7 +188,7 @@ export default function App() {
             setDialogOpen(true);
           }}
           style={{ position: 'fixed', right: '1rem', bottom: '1.5rem', zIndex: 40 }}
-          className="h-14 w-14 rounded-full bg-slate-900 text-white text-3xl leading-none shadow-lg hover:bg-slate-800"
+          className="h-14 w-14 rounded-full bg-slate-900 text-white text-3xl leading-none shadow-lg hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           aria-label="支出を追加"
         >
           ＋
