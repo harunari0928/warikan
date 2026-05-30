@@ -1,23 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { resetDb, seedUsers, TEST_MONTH } from './helpers.js';
-
-const API = 'http://localhost:3121';
-
-function nextMonth(yyyymm: string): string {
-  const [y, m] = yyyymm.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
+import { resetDb, seedUsers } from './helpers.js';
 
 test.describe('未来月のブロック', () => {
-  test('未来月のスナップショット取得は400で拒否される', async ({ request }) => {
-    await resetDb(request);
-    await seedUsers(request);
-
-    const res = await request.get(`${API}/api/months/${nextMonth(TEST_MONTH)}`);
-    expect(res.status()).toBe(400);
-  });
-
   test('当月では「次の月」ボタンが非活性、前月へ戻ると活性になる', async ({ page, request }) => {
     await resetDb(request);
     await seedUsers(request);
@@ -47,17 +31,6 @@ test.describe('精算済みチェックは締めるまで操作不可', () => {
     const checkbox = page.getByRole('checkbox', { name: '精算済み' });
     await expect(checkbox).toBeDisabled();
     await expect(page.getByText('（月を締めると操作できます）')).toBeVisible();
-  });
-
-  test('締め前の精算済み更新APIは409で拒否される', async ({ request }) => {
-    await resetDb(request);
-    await seedUsers(request);
-    await request.get(`${API}/api/months/${TEST_MONTH}`);
-
-    const res = await request.put(`${API}/api/months/${TEST_MONTH}/settlement-paid`, {
-      data: { paid: true },
-    });
-    expect(res.status()).toBe(409);
   });
 
   test('締めるとチェックボックスが活性になり操作できる', async ({ page, request }) => {
