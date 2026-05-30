@@ -26,16 +26,26 @@ test.describe('ユーザ切替', () => {
     await expect(page.getByRole('tab', { name: '夫' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('自分の手取りは編集でき、別ユーザの手取りは編集できない', async ({ page }) => {
-    await page.goto('/');
+  for (const { self, partner } of [
+    { self: '妻', partner: '夫' },
+    { self: '夫', partner: '妻' },
+  ]) {
+    test(`${self}を選ぶと自分の手取りだけ編集でき、${partner}の手取りは編集できない`, async ({
+      page,
+    }) => {
+      // Arrange
+      await page.goto('/');
 
-    // 妻の表示では妻の手取りだけ編集でき、夫の手取りはロックされている
-    await expect(page.getByLabel('妻の手取り')).toBeEnabled();
-    await expect(page.getByLabel('夫の手取り')).toBeDisabled();
+      // Act
+      await page.getByRole('tab', { name: self }).click();
 
-    // 夫に切り替えると逆になる
-    await page.getByRole('tab', { name: '夫' }).click();
-    await expect(page.getByLabel('夫の手取り')).toBeEnabled();
-    await expect(page.getByLabel('妻の手取り')).toBeDisabled();
-  });
+      // Assert
+      await test.step('自分の手取りは編集できる', async () => {
+        await expect(page.getByLabel(`${self}の手取り`)).toBeEnabled();
+      });
+      await test.step('相手の手取りは編集できない', async () => {
+        await expect(page.getByLabel(`${partner}の手取り`)).toBeDisabled();
+      });
+    });
+  }
 });
