@@ -11,6 +11,10 @@ export default defineConfig({
     outDir: 'dist/client',
   },
   server: {
+    watch: {
+      // SQLite ファイル（WAL/SHM 含む）への書き込みでフルリロードが走るのを防ぐ
+      ignored: ['**/*.db', '**/*.db-wal', '**/*.db-shm', '**/data/**'],
+    },
     proxy: {
       '/api': {
         target: `http://localhost:${apiPort}`,
