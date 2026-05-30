@@ -46,15 +46,28 @@ test.describe('支出CRUD', () => {
     ).toBeVisible();
   });
 
-  test('ユーザ切替で表示される支出が変わる', async ({ page }) => {
+  test('タブを切り替えるとそのユーザの明細が表示される', async ({ page }) => {
     await page.goto('/');
+
+    // 妻の明細を追加
     await page.getByRole('button', { name: '支出を追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('妻の支出');
     await page.getByRole('textbox', { name: '金額' }).fill('10000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
+    await expect(page.getByRole('button', { name: /妻の支出/ })).toBeVisible();
 
+    // 夫に切り替えて夫の明細を追加
     await page.getByRole('tab', { name: '夫' }).click();
-    await expect(page.getByText('今月の支出はまだありません')).toBeVisible();
     await expect(page.getByRole('button', { name: /妻の支出/ })).not.toBeVisible();
+    await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('textbox', { name: '説明' }).fill('夫の支出');
+    await page.getByRole('textbox', { name: '金額' }).fill('20000');
+    await page.getByRole('button', { name: '追加', exact: true }).click();
+    await expect(page.getByRole('button', { name: /夫の支出/ })).toBeVisible();
+
+    // 妻に戻すと妻の明細だけが表示される
+    await page.getByRole('tab', { name: '妻' }).click();
+    await expect(page.getByRole('button', { name: /妻の支出/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /夫の支出/ })).not.toBeVisible();
   });
 });
