@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetDb, seedUsers, TEST_MONTH } from './helpers.js';
+import { resetDb, seedUsers } from './helpers.js';
 
 test.describe('支出CRUD', () => {
   test.beforeEach(async ({ request, page }) => {
