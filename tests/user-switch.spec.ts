@@ -23,4 +23,27 @@ test.describe('ユーザ切替', () => {
     await page.reload();
     await expect(page.getByRole('tab', { name: '夫', selected: true })).toBeVisible();
   });
+
+  for (const { self, partner } of [
+    { self: '妻', partner: '夫' },
+    { self: '夫', partner: '妻' },
+  ]) {
+    test(`${self}を選ぶと自分の手取りだけ編集でき、${partner}の手取りは編集できない`, async ({
+      page,
+    }) => {
+      // Arrange
+      await page.goto('/');
+
+      // Act
+      await page.getByRole('tab', { name: self }).click();
+
+      // Assert
+      await test.step('自分の手取りは編集できる', async () => {
+        await expect(page.getByLabel(`${self}の手取り`)).toBeEnabled();
+      });
+      await test.step('相手の手取りは編集できない', async () => {
+        await expect(page.getByLabel(`${partner}の手取り`)).toBeDisabled();
+      });
+    });
+  }
 });

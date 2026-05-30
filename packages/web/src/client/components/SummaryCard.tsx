@@ -6,13 +6,20 @@ import AmountInput from './AmountInput.js';
 type Props = {
   snapshot: MonthSnapshot;
   users: User[];
+  currentUserId: number | null;
   onIncomeChange: (userId: number, amount: number) => Promise<void>;
   onPaidChange: (paid: boolean) => Promise<void>;
 };
 
 const USER_DOT_COLORS = ['bg-rose-500', 'bg-sky-500'];
 
-export default function SummaryCard({ snapshot, users, onIncomeChange, onPaidChange }: Props) {
+export default function SummaryCard({
+  snapshot,
+  users,
+  currentUserId,
+  onIncomeChange,
+  onPaidChange,
+}: Props) {
   const { month, incomes, settlement } = snapshot;
   const totalsByUser = new Map(settlement.perUserTotals.map((t) => [t.user_id, t.total]));
   const incomeByUser = new Map(incomes.map((i) => [i.user_id, i.amount]));
@@ -49,7 +56,7 @@ export default function SummaryCard({ snapshot, users, onIncomeChange, onPaidCha
             user={u}
             dotColor={USER_DOT_COLORS[idx % USER_DOT_COLORS.length]}
             value={incomeByUser.get(u.id) ?? 0}
-            disabled={month.is_closed}
+            disabled={month.is_closed || u.id !== currentUserId}
             onCommit={(n) => onIncomeChange(u.id, n)}
           />
         ))}
