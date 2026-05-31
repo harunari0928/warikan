@@ -1,35 +1,53 @@
 import { test, expect } from '@playwright/test';
-import { calculateSettlement } from '@warikan/shared';
+import { resetDb, seedUsers, setIncome, addExpense, TEST_MONTH } from './helpers.js';
 
-test.describe('割勘ロジック', () => {
-  test('夫が多く稼ぎ、妻が多く支出した場合、夫が妻に払う', () => {
-    const r = calculateSettlement(
-      { userId: 1, income: 300000, expense: 120000 },
-      { userId: 2, income: 400000, expense: 35000 },
-    );
-    expect(r.amount).toBe(92500);
-    expect(r.fromUserId).toBe(2);
-    expect(r.toUserId).toBe(1);
+test.describe('割勘の精算結果', () => {
+  test('夫の手取りが多いと、夫が妻に払う額が表示される', async ({ page, request }) => {
+    // Arrange: 妻30万 / 夫40万 を登録する
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 300000);
+    await setIncome(request, TEST_MONTH, husband, 400000);
+
+    // Act
+    await page.goto('/');
+
+    // Assert
+    const summary = page.getByRole('region', { name: '月次サマリー' });
+    await expect(summary.getByText('夫 → 妻')).toBeVisible();
+    await expect(summary.getByText('¥50,000')).toBeVisible();
   });
 
-  test('同額の手取り・支出なら精算不要', () => {
-    const r = calculateSettlement(
-      { userId: 1, income: 300000, expense: 50000 },
-      { userId: 2, income: 300000, expense: 50000 },
-    );
-    expect(r.amount).toBe(0);
-    expect(r.fromUserId).toBeNull();
-    expect(r.toUserId).toBeNull();
+  test('手取りが同額で支出がなければ精算不要と表示される', async ({ page, request }) => {
+    // Arrange: 妻30万 / 夫30万 を登録する
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 300000);
+    await setIncome(request, TEST_MONTH, husband, 300000);
+
+    // Act
+    await page.goto('/');
+
+    // Assert
+    await expect(
+      page.getByRole('region', { name: '月次サマリー' }).getByText('精算不要（同額）'),
+    ).toBeVisible();
   });
 
-  test('妻が多く稼ぎ夫が多く支出すると、夫が妻に払う', () => {
-    const r = calculateSettlement(
-      { userId: 1, income: 500000, expense: 50000 },
-      { userId: 2, income: 300000, expense: 200000 },
-    );
-    // (500000 + 200000 - 300000 - 50000) / 2 = 175000 → wife pays husband
-    expect(r.amount).toBe(175000);
-    expect(r.fromUserId).toBe(1);
-    expect(r.toUserId).toBe(2);
+  test('夫の支出が多いと、妻が夫に払う額が表示される', async ({ page, request }) => {
+    // Arrange: 手取りは同額、夫だけ10万の支出を登録する
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 300000);
+    await setIncome(request, TEST_MONTH, husband, 300000);
+    await addExpense(request, TEST_MONTH, husband, '家電', 100000);
+
+    // Act
+    await page.goto('/');
+
+    // Assert
+    const summary = page.getByRole('region', { name: '月次サマリー' });
+    await expect(summary.getByText('妻 → 夫')).toBeVisible();
+    await expect(summary.getByText('¥50,000')).toBeVisible();
   });
 });

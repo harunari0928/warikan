@@ -55,6 +55,23 @@ test.describe('支出CRUD', () => {
     ).toBeVisible();
   });
 
+  test('支出を削除すると一覧から消える', async ({ page }) => {
+    // Arrange: 食費の支出を1件追加する
+    await page.goto('/');
+    await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('textbox', { name: '説明' }).fill('食費');
+    await page.getByRole('textbox', { name: '金額' }).fill('3000');
+    await page.getByRole('button', { name: '追加', exact: true }).click();
+    await page.getByRole('button', { name: /食費/ }).waitFor();
+
+    // Act: 削除する
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '削除' }).click();
+
+    // Assert
+    await expect(page.getByText('今月の支出はまだありません')).toBeVisible();
+  });
+
   test('タブを切り替えるとそのユーザの明細が表示される', async ({ page }) => {
     await page.goto('/');
 

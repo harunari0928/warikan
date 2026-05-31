@@ -29,9 +29,17 @@ Playwright E2E tests.
 
 未来月のブロック、および精算済みチェックの締め前ロック。
 
+## fixed-template-admin.spec.ts
+
+固定費テンプレート管理画面（設定 → `#/templates`）。テンプレートを削除すると一覧から消えることの確認。
+
 ## user-switch.spec.ts
 
 ユーザ切替と、自分以外の手取りが編集できないことの確認。
+
+## monthly-income.spec.ts
+
+月を切り替えると、その月の手取りが表示されることの確認。
 
 ## Test conventions
 

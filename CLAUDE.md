@@ -74,6 +74,8 @@ npx playwright test tests/close-month.spec.ts    # 月の締めE2E
 - 各テストは `POST /api/test/reset` で DB をクリーンにしてから実行。
 - `data/test_warikan.db` を使用。
 
+テスト作成時の方針・規約は [`tests/CLAUDE.md`](tests/CLAUDE.md) を参照（household-tasks と同じユーザ目線の規約を共有）。
+
 ## Deployment
 
 ```bash
