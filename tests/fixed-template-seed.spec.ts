@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { resetDb, seedUsers, addFixedTemplate } from './helpers.js';
 
 test.describe('固定費テンプレートの自動投入', () => {
-  test('月を初めて開くと固定費テンプレが自動で投入される', async ({ page, request }) => {
+  test('月を初めて開くと固定費テンプレが表示される', async ({ page, request }) => {
     await resetDb(request);
     const { wife, husband } = await seedUsers(request);
     await addFixedTemplate(request, wife, '家賃', 59000);
