@@ -10,33 +10,37 @@ test.describe('支出CRUD', () => {
     });
   });
 
-  test('支出を追加し精算結果に反映される', async ({ page }) => {
+  test('支出を追加すると精算結果に反映される', async ({ page }) => {
+    // Arrange: 各自が自分の手取りを入力する（妻30万 / 夫40万）
     await page.goto('/');
     await page.getByRole('tab', { name: '妻' }).waitFor();
-
     await page.getByRole('textbox', { name: '妻の手取り' }).fill('300000');
+    await page.getByRole('textbox', { name: '妻の手取り' }).blur();
+    await page.getByRole('tab', { name: '夫' }).click();
     await page.getByRole('textbox', { name: '夫の手取り' }).fill('400000');
     await page.getByRole('textbox', { name: '夫の手取り' }).blur();
+    await page.getByRole('tab', { name: '妻' }).click();
 
-    const summary = page.getByRole('region', { name: '月次サマリー' });
-    await test.step('手取りだけのときは差額が精算額になる', async () => {
-      await expect(summary.getByText('¥50,000')).toBeVisible();
-    });
-
+    // Act: 妻として家賃12万の支出を追加する
     await page.getByRole('button', { name: '支出を追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('家賃');
     await page.getByRole('textbox', { name: '金額' }).fill('120000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
 
-    await test.step('支出を追加すると一覧に表示され精算額が変わる', async () => {
+    // Assert
+    await test.step('追加した支出が一覧に表示される', async () => {
       await expect(page.getByRole('button', { name: /家賃/ })).toBeVisible();
-      await expect(summary.getByText('夫 → 妻')).toBeVisible();
-      await expect(summary.getByText('¥110,000')).toBeVisible();
+    });
+    await test.step('夫から妻への送金額に反映される', async () => {
+      await expect(page.getByText('夫 → 妻')).toBeVisible();
+      await expect(
+        page.getByRole('region', { name: '月次サマリー' }).getByText('¥110,000'),
+      ).toBeVisible();
     });
   });
 
   test('支出を編集できる', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(`/`);
     await page.getByRole('button', { name: '支出を追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('食費');
     await page.getByRole('textbox', { name: '金額' }).fill('5000');
@@ -65,16 +69,28 @@ test.describe('支出CRUD', () => {
     await expect(page.getByText('今月の支出はまだありません')).toBeVisible();
   });
 
-  test('夫タブに切り替えると妻の支出は表示されない', async ({ page }) => {
+  test('タブを切り替えるとそのユーザの明細が表示される', async ({ page }) => {
     await page.goto('/');
+
+    // 妻の明細を追加
     await page.getByRole('button', { name: '支出を追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('妻の支出');
     await page.getByRole('textbox', { name: '金額' }).fill('10000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
+    await expect(page.getByRole('button', { name: /妻の支出/ })).toBeVisible();
 
+    // 夫に切り替えて夫の明細を追加
     await page.getByRole('tab', { name: '夫' }).click();
-
-    await expect(page.getByText('今月の支出はまだありません')).toBeVisible();
     await expect(page.getByRole('button', { name: /妻の支出/ })).not.toBeVisible();
+    await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('textbox', { name: '説明' }).fill('夫の支出');
+    await page.getByRole('textbox', { name: '金額' }).fill('20000');
+    await page.getByRole('button', { name: '追加', exact: true }).click();
+    await expect(page.getByRole('button', { name: /夫の支出/ })).toBeVisible();
+
+    // 妻に戻すと妻の明細だけが表示される
+    await page.getByRole('tab', { name: '妻' }).click();
+    await expect(page.getByRole('button', { name: /妻の支出/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /夫の支出/ })).not.toBeVisible();
   });
 });

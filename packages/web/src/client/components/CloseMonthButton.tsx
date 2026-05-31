@@ -24,7 +24,7 @@ export default function CloseMonthButton({ yearMonth, closed, onClose, onOpen }:
       <button
         type="button"
         onClick={handleOpen}
-        className="min-h-11 px-4 rounded-xl text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-sm font-medium"
+        className="min-h-11 px-4 rounded-xl text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 dark:text-amber-200 dark:bg-amber-950 dark:border-amber-900 dark:hover:bg-amber-900 text-sm font-medium"
       >
         締めを解除
       </button>
@@ -34,7 +34,7 @@ export default function CloseMonthButton({ yearMonth, closed, onClose, onOpen }:
     <button
       type="button"
       onClick={handleClose}
-      className="min-h-11 px-5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800"
+      className="min-h-11 px-5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
     >
       月を締める
     </button>

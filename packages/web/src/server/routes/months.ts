@@ -69,6 +69,11 @@ router.put('/:yyyymm/settlement-paid', (req: Request, res: Response, next: NextF
   try {
     const db = getDb();
     const month = getMonthRowOr404(db, ym);
+    // 月を締めるまで精算済みフラグは変更できない
+    if (month.is_closed !== 1) {
+      res.status(409).json({ error: 'month must be closed before settlement can be marked paid' });
+      return;
+    }
     db.prepare(
       'UPDATE months SET settlement_paid = ?, settlement_paid_at = ? WHERE id = ?',
     ).run(paid ? 1 : 0, paid ? getNowISO() : null, month.id);

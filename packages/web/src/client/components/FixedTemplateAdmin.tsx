@@ -48,12 +48,12 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
   };
 
   return (
-    <div className="px-4 py-4 space-y-4 pb-safe">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 px-4 py-4 space-y-4 pb-safe">
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onBack}
-          className="h-10 w-10 -ml-2 rounded-lg hover:bg-slate-100 text-slate-700"
+          className="h-10 w-10 -ml-2 rounded-lg hover:bg-slate-100 text-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
           aria-label="戻る"
         >
           ←
@@ -62,25 +62,25 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
           テンプレートはまだありません
         </div>
       ) : (
-        <ul className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
+        <ul className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
           {templates.map((t) => {
             const user = users.find((u) => u.id === t.user_id);
             return (
               <li key={t.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-900 truncate">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
                     {t.description}
                     {t.is_active === 0 && (
-                      <span className="ml-2 text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
+                      <span className="ml-2 text-[10px] text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800 rounded px-1.5 py-0.5">
                         無効
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500">{user?.name ?? '?'}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{user?.name ?? '?'}</div>
                 </div>
                 <div className="text-sm tabular-nums">¥{formatYen(t.amount)}</div>
                 <div className="flex gap-1">
@@ -90,7 +90,7 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
                       setEditing(t);
                       setShowForm(true);
                     }}
-                    className="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100"
+                    className="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
                     aria-label="編集"
                   >
                     ✎
@@ -98,7 +98,7 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
                   <button
                     type="button"
                     onClick={() => handleDelete(t)}
-                    className="h-9 w-9 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    className="h-9 w-9 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
                     aria-label="削除"
                   >
                     🗑
@@ -116,7 +116,7 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
           setEditing(null);
           setShowForm(true);
         }}
-        className="w-full min-h-11 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800"
+        className="w-full min-h-11 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
       >
         ＋ テンプレートを追加
       </button>
@@ -166,18 +166,18 @@ function TemplateForm({
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto pb-safe"
+        className="w-full sm:max-w-md bg-white dark:bg-slate-900 dark:text-slate-100 rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto pb-safe"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-4 pb-5 space-y-4">
           <h3 className="text-base font-semibold">{initial ? 'テンプレートを編集' : 'テンプレートを追加'}</h3>
 
           <label className="block">
-            <span className="text-xs text-slate-600">ユーザー</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">ユーザー</span>
             <select
               value={userId}
               onChange={(e) => setUserId(Number(e.target.value))}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800"
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -188,12 +188,12 @@ function TemplateForm({
           </label>
 
           <label className="block">
-            <span className="text-xs text-slate-600">説明</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">説明</span>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-slate-400 dark:focus:ring-slate-400"
             />
           </label>
 
@@ -205,12 +205,12 @@ function TemplateForm({
           </label>
 
           <label className="block">
-            <span className="text-xs text-slate-600">備考 (任意)</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">備考 (任意)</span>
             <input
               type="text"
               value={note ?? ''}
               onChange={(e) => setNote(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-slate-400 dark:focus:ring-slate-400"
             />
           </label>
 
@@ -219,13 +219,13 @@ function TemplateForm({
               type="checkbox"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="h-5 w-5 rounded border-slate-300"
+              className="h-5 w-5 rounded border-slate-300 dark:border-slate-600"
             />
             <span className="text-sm">有効（次月以降の表に自動投入）</span>
           </label>
 
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={onClose} className="min-h-11 px-4 rounded-xl text-slate-700 hover:bg-slate-100">
+            <button type="button" onClick={onClose} className="min-h-11 px-4 rounded-xl text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
               キャンセル
             </button>
             <button
@@ -245,7 +245,7 @@ function TemplateForm({
                   setSubmitting(false);
                 }
               }}
-              className="min-h-11 px-5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:bg-slate-300"
+              className="min-h-11 px-5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:bg-slate-300 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
             >
               {initial ? '保存' : '追加'}
             </button>

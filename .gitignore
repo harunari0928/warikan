@@ -10,3 +10,6 @@ playwright-report/
 .env.local
 *.log
 .DS_Store
+
+# git worktrees (.claude/worktrees/<name>)
+.claude/worktrees/
