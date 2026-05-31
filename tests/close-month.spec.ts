@@ -23,7 +23,7 @@ test.describe('月の締めとロック', () => {
       await expect(page.getByRole('button', { name: '締めを解除' })).toBeVisible();
     });
 
-    await test.step('既存の支出は編集できない', async () => {
+    await test.step('支出追加ボタンが非表示になる', async () => {
       await expect(page.getByRole('button', { name: /家賃/ })).toBeDisabled();
     });
   });
