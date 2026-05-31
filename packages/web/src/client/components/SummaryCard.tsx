@@ -45,7 +45,7 @@ export default function SummaryCard({ snapshot, users, onIncomeChange, onPaidCha
       <div className="space-y-2.5">
         {users.map((u, idx) => (
           <IncomeRow
-            key={u.id}
+            key={`${month.year_month}-${u.id}`}
             user={u}
             dotColor={USER_DOT_COLORS[idx % USER_DOT_COLORS.length]}
             value={incomeByUser.get(u.id) ?? 0}
