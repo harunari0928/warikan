@@ -15,6 +15,7 @@ function shiftMonth(yyyymm: string, delta: number): string {
 
 test.describe('月ごとの手取り', () => {
   test('月を切り替えるとその月の手取りが表示される', async ({ page, request }) => {
+    // Arrange: 当月は妻30万、前月は妻10万を登録する
     await resetDb(request);
     const { wife } = await seedUsers(request);
     const thisMonth = currentMonth();
@@ -22,20 +23,26 @@ test.describe('月ごとの手取り', () => {
     await setIncome(request, thisMonth, wife, 300000);
     await setIncome(request, lastMonth, wife, 100000);
 
+    // Act
     await page.goto('/');
 
+    // Assert
     await test.step('当月は当月の手取りが表示される', async () => {
       await expect(page.getByLabel('妻の手取り')).toHaveValue('300000');
     });
 
+    // Act
     await page.getByRole('button', { name: '前の月' }).click();
 
+    // Assert
     await test.step('前月に切り替えると前月の手取りが表示される', async () => {
       await expect(page.getByLabel('妻の手取り')).toHaveValue('100000');
     });
 
+    // Act
     await page.getByRole('button', { name: '次の月' }).click();
 
+    // Assert
     await test.step('当月に戻すと当月の手取りが表示される', async () => {
       await expect(page.getByLabel('妻の手取り')).toHaveValue('300000');
     });
