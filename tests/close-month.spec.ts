@@ -47,7 +47,7 @@ test.describe('月の締めとロック', () => {
 
     await checkbox.click();
 
-    await test.step('チェックすると精算済みとして記録される', async () => {
+    await test.step('チェックすると精算済みと表示する', async () => {
       await expect(checkbox).toBeChecked();
       await expect(page.getByText(/精算済み \(/)).toBeVisible();
     });
