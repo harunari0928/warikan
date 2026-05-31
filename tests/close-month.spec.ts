@@ -2,23 +2,33 @@ import { test, expect } from '@playwright/test';
 import { resetDb, seedUsers, addExpense, setIncome, TEST_MONTH } from './helpers.js';
 
 test.describe('月の締めとロック', () => {
-  test('締め後はFABが非表示・行が薄表示・締めを解除ボタンが現れる', async ({ page, request }) => {
+  test('月を締めると支出の追加・編集ができなくなる', async ({ page, request }) => {
     await resetDb(request);
     const { wife } = await seedUsers(request);
     await addExpense(request, TEST_MONTH, wife, '家賃', 120000);
 
     await page.goto('/');
-
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: '月を締める' }).click();
 
-    await expect(page.getByText('締め済')).toBeVisible();
-    await expect(page.getByRole('button', { name: '支出を追加' })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: '締めを解除' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /家賃/ })).toBeDisabled();
+    await test.step('締め済として表示される', async () => {
+      await expect(page.getByText('締め済')).toBeVisible();
+    });
+
+    await test.step('支出を追加ボタンが消える', async () => {
+      await expect(page.getByRole('button', { name: '支出を追加' })).not.toBeVisible();
+    });
+
+    await test.step('締めを解除ボタンが現れる', async () => {
+      await expect(page.getByRole('button', { name: '締めを解除' })).toBeVisible();
+    });
+
+    await test.step('既存の支出は編集できない', async () => {
+      await expect(page.getByRole('button', { name: /家賃/ })).toBeDisabled();
+    });
   });
 
-  test('精算済みチェックは締め後でも操作可能', async ({ page, request }) => {
+  test('精算済みチェックは締め後でも操作できる', async ({ page, request }) => {
     await resetDb(request);
     const { wife, husband } = await seedUsers(request);
     await setIncome(request, TEST_MONTH, wife, 300000);
@@ -28,28 +38,39 @@ test.describe('月の締めとロック', () => {
     await page.goto('/');
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: '月を締める' }).click();
-    await expect(page.getByText('締め済')).toBeVisible();
+    await page.getByText('締め済').waitFor();
 
     const checkbox = page.getByRole('checkbox', { name: '精算済み' });
-    await expect(checkbox).not.toBeChecked();
+    await test.step('締めた直後は未チェック', async () => {
+      await expect(checkbox).not.toBeChecked();
+    });
+
     await checkbox.click();
-    await expect(checkbox).toBeChecked();
-    await expect(page.getByText(/精算済み \(/)).toBeVisible();
+
+    await test.step('チェックすると精算済みとして記録される', async () => {
+      await expect(checkbox).toBeChecked();
+      await expect(page.getByText(/精算済み \(/)).toBeVisible();
+    });
   });
 
-  test('締めを解除すれば再度編集可能になる', async ({ page, request }) => {
+  test('締めを解除すれば再度編集できるようになる', async ({ page, request }) => {
     await resetDb(request);
     await seedUsers(request);
 
     await page.goto('/');
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: '月を締める' }).click();
-    await expect(page.getByText('締め済')).toBeVisible();
+    await page.getByText('締め済').waitFor();
 
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: '締めを解除' }).click();
 
-    await expect(page.getByRole('button', { name: '月を締める' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '支出を追加' })).toBeVisible();
+    await test.step('月を締めるボタンが戻る', async () => {
+      await expect(page.getByRole('button', { name: '月を締める' })).toBeVisible();
+    });
+
+    await test.step('支出を追加できるようになる', async () => {
+      await expect(page.getByRole('button', { name: '支出を追加' })).toBeVisible();
+    });
   });
 });
