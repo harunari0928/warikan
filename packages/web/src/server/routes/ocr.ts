@@ -95,12 +95,15 @@ async function callOpenAI(apiKey: string, imageDataUrl: string): Promise<OcrPars
       },
       body: JSON.stringify(payload),
     });
-  } catch {
+  } catch (e) {
+    // 接続失敗（DNS/タイムアウト/TLS等）。生エラーを残さないと原因が追えないため記録する。
+    console.error('[ocr] OpenAI への接続に失敗しました', e);
     throw httpError('OCRに失敗しました', 502);
   }
 
   if (!resp.ok) {
-    console.error('OpenAI API error', resp.status, await resp.text().catch(() => ''));
+    const body = await resp.text().catch(() => '');
+    console.error('[ocr] OpenAI API がエラーを返しました', resp.status, body);
     throw httpError('OCRに失敗しました', 502);
   }
 
@@ -109,11 +112,13 @@ async function callOpenAI(apiKey: string, imageDataUrl: string): Promise<OcrPars
   };
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== 'string') {
+    console.error('[ocr] OpenAI レスポンスに content がありません', JSON.stringify(data));
     throw httpError('OCRに失敗しました', 502);
   }
   try {
     return JSON.parse(content) as OcrParsed;
-  } catch {
+  } catch (e) {
+    console.error('[ocr] OpenAI レスポンスの JSON パースに失敗しました', e, content);
     throw httpError('OCRに失敗しました', 502);
   }
 }
