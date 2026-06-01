@@ -7,6 +7,7 @@ import { getDb } from './db.js';
 import usersRouter from './routes/users.js';
 import monthsRouter from './routes/months.js';
 import fixedTemplatesRouter from './routes/fixed-templates.js';
+import ocrRouter from './routes/ocr.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,13 +15,15 @@ const app: Express = express();
 const PORT = parseInt(process.env.PORT || '3100', 10);
 
 app.use(cors());
-app.use(express.json());
+// レシート画像(base64 data URL)を受け取るため上限を引き上げる
+app.use(express.json({ limit: '15mb' }));
 
 getDb();
 
 app.use('/api/users', usersRouter);
 app.use('/api/months', monthsRouter);
 app.use('/api/fixed-expense-templates', fixedTemplatesRouter);
+app.use('/api/ocr', ocrRouter);
 
 if (process.env.NODE_ENV !== 'production') {
   app.post('/api/test/reset', (_req: Request, res: Response) => {

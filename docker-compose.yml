@@ -14,6 +14,7 @@ services:
       - PORT=3100
       - TZ=Asia/Tokyo
       - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     labels:
       - "com.centurylinklabs.watchtower.scope=warikan"
     restart: unless-stopped
