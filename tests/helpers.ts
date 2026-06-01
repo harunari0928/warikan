@@ -60,4 +60,11 @@ export async function addFixedTemplate(
   });
 }
 
-export const TEST_MONTH = '2026-05';
+// アプリは起動時に「当月（JST）」を開くため、テスト対象の月も当月に揃える。
+// 固定値にすると月が変わった瞬間に当月とズレてE2Eが落ちる。
+function currentMonthJST(): string {
+  const tokyo = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  return `${tokyo.getFullYear()}-${String(tokyo.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export const TEST_MONTH = currentMonthJST();
