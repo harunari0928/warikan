@@ -39,7 +39,17 @@ router.post('/:yyyymm/close', (req: Request, res: Response, next: NextFunction) 
       getNowISO(),
       month.id,
     );
-    res.json(loadMonthSnapshot(db, ym));
+    // 精算不要（送金なし）の月は締めた時点で送金完了とみなし、自動で精算済みにする
+    const snapshot = loadMonthSnapshot(db, ym);
+    if (snapshot.settlement.amount === 0 && !snapshot.month.settlement_paid) {
+      db.prepare('UPDATE months SET settlement_paid = 1, settlement_paid_at = ? WHERE id = ?').run(
+        getNowISO(),
+        month.id,
+      );
+      res.json(loadMonthSnapshot(db, ym));
+      return;
+    }
+    res.json(snapshot);
   } catch (e) {
     next(e);
   }

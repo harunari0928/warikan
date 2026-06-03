@@ -4,6 +4,7 @@ import Header from './components/Header.js';
 import SummaryCard from './components/SummaryCard.js';
 import ExpenseList from './components/ExpenseList.js';
 import ExpenseDialog from './components/ExpenseDialog.js';
+import ReceiptScanDialog from './components/ReceiptScanDialog.js';
 import CloseMonthButton from './components/CloseMonthButton.js';
 import FixedTemplateAdmin from './components/FixedTemplateAdmin.js';
 import { useToast } from './components/Toast.js';
@@ -74,6 +75,8 @@ export default function App() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   // 楽観的に snapshot を更新 → API 呼び出し。失敗したら直前の状態へロールバックしトーストで通知する。
   // snapshot を返すエンドポイント（手取り・精算済み・締め/解除）用。
@@ -285,16 +288,72 @@ export default function App() {
       {!isClosed && currentUserId !== null ? (
         <button
           type="button"
-          onClick={() => {
-            setEditingExpense(null);
-            setDialogOpen(true);
-          }}
+          onClick={() => setMenuOpen(true)}
           style={{ position: 'fixed', right: '1rem', bottom: '1.5rem', zIndex: 40 }}
           className="h-14 w-14 rounded-full bg-slate-900 text-white text-3xl leading-none shadow-lg hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           aria-label="支出を追加"
         >
           ＋
         </button>
+      ) : null}
+
+      {menuOpen ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="追加方法を選択"
+          onClick={() => setMenuOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl pb-safe"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
+              <div className="h-1 w-10 rounded-full bg-slate-300" />
+            </div>
+            <div className="px-5 pt-3 pb-3">
+              <h3 className="text-base font-semibold mb-3">支出を追加</h3>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditingExpense(null);
+                    setDialogOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 min-h-14 px-4 rounded-xl border border-slate-200 text-left hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg" aria-hidden>
+                    ✏️
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-slate-900">手入力で追加</span>
+                    <span className="block text-xs text-slate-500">説明と金額を入力する</span>
+                  </span>
+                  <span className="shrink-0 text-slate-300" aria-hidden>›</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setScanOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 min-h-14 px-4 rounded-xl border border-slate-200 text-left hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg" aria-hidden>
+                    🧾
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-slate-900">レシートを撮影</span>
+                    <span className="block text-xs text-slate-500">明細を自動で読み取る</span>
+                  </span>
+                  <span className="shrink-0 text-slate-300" aria-hidden>›</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <ExpenseDialog
@@ -305,6 +364,14 @@ export default function App() {
           setEditingExpense(null);
         }}
         onSubmit={handleSubmitExpense}
+      />
+
+      <ReceiptScanDialog
+        open={scanOpen}
+        yearMonth={yearMonth}
+        userId={currentUserId}
+        onClose={() => setScanOpen(false)}
+        onAdded={refetch}
       />
     </div>
   );

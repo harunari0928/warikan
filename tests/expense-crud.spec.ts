@@ -23,6 +23,7 @@ test.describe('支出CRUD', () => {
 
     // Act: 妻として家賃12万の支出を追加する
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('家賃');
     await page.getByRole('textbox', { name: '金額' }).fill('120000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -42,6 +43,7 @@ test.describe('支出CRUD', () => {
   test('支出を編集できる', async ({ page }) => {
     await page.goto(`/`);
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('食費');
     await page.getByRole('textbox', { name: '金額' }).fill('5000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -59,6 +61,7 @@ test.describe('支出CRUD', () => {
     // Arrange: 食費の支出を1件追加する
     await page.goto('/');
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('食費');
     await page.getByRole('textbox', { name: '金額' }).fill('3000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -77,6 +80,7 @@ test.describe('支出CRUD', () => {
 
     // 妻の明細を追加
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('妻の支出');
     await page.getByRole('textbox', { name: '金額' }).fill('10000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -86,6 +90,7 @@ test.describe('支出CRUD', () => {
     await page.getByRole('tab', { name: '夫' }).click();
     await expect(page.getByRole('button', { name: /妻の支出/ })).not.toBeVisible();
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('夫の支出');
     await page.getByRole('textbox', { name: '金額' }).fill('20000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -110,6 +115,7 @@ test.describe('支出操作中にAPIエラーが起きたとき', () => {
 
     // Act: 「外食 3000円」を追加しようとする
     await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
     await page.getByRole('textbox', { name: '説明' }).fill('外食');
     await page.getByRole('textbox', { name: '金額' }).fill('3000');
     await page.getByRole('button', { name: '追加', exact: true }).click();
