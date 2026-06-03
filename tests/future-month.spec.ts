@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetDb, seedUsers } from './helpers.js';
+import { resetDb, seedUsers, setIncome, TEST_MONTH } from './helpers.js';
 
 test.describe('未来月のブロック', () => {
   test('当月では「次の月」ボタンが非活性、前月へ戻ると活性になる', async ({ page, request }) => {
@@ -34,8 +34,11 @@ test.describe('精算済みチェックは締めるまで操作不可', () => {
   });
 
   test('締めるとチェックボックスが活性になり操作できる', async ({ page, request }) => {
+    // 妻30万・夫40万 → 夫が妻に送金。送金される側の妻（初期表示）が操作できる。
     await resetDb(request);
-    await seedUsers(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 300000);
+    await setIncome(request, TEST_MONTH, husband, 400000);
 
     await page.goto('/');
 
