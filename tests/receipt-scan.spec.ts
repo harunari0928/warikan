@@ -31,38 +31,49 @@ test.describe('レシートから明細を取り込む', () => {
     await expect(page.getByRole('button', { name: /台所用洗剤/ })).not.toBeVisible();
   });
 
-  test('税率の判定が誤っている明細は、税率を変えると税込金額が再計算されて登録される', async ({
-    page,
-  }) => {
-    // Arrange
-    await page.goto('/');
-    await page.getByRole('tab', { name: '妻' }).waitFor();
+  // 税率を切り替えると、税抜に戻して新しい税率を掛け直した税込金額に再計算される。
+  // 8%→10%（牛乳: ¥216→¥220）と 10%→8%（台所用洗剤: ¥330→¥324）の両方向を確認する。
+  const rateChangeCases = [
+    { item: '牛乳', from: 8, to: 10, before: '¥216', after: '¥220' },
+    { item: '台所用洗剤', from: 10, to: 8, before: '¥330', after: '¥324' },
+  ];
 
-    await page.getByRole('button', { name: '支出を追加' }).click();
-    await page.getByRole('button', { name: 'レシートを撮影' }).click();
-    await page.getByLabel('レシート画像').setInputFiles('tests/fixtures/receipt-ok.png');
-    await page.getByRole('checkbox', { name: '台所用洗剤' }).waitFor();
+  for (const { item, from, to, before, after } of rateChangeCases) {
+    test(`${item}の税率を${from}%から${to}%に変えると、税込金額が${before}から${after}に再計算されて登録される`, async ({
+      page,
+    }) => {
+      // Arrange
+      await page.goto('/');
+      await page.getByRole('tab', { name: '妻' }).waitFor();
 
-    // Act — 10%と読み取られた台所用洗剤の税率を8%に切り替えてから全明細を追加する
-    await page.getByRole('button', { name: '台所用洗剤の税率: 10%（タップで切り替え）' }).click();
+      await page.getByRole('button', { name: '支出を追加' }).click();
+      await page.getByRole('button', { name: 'レシートを撮影' }).click();
+      await page.getByLabel('レシート画像').setInputFiles('tests/fixtures/receipt-ok.png');
+      await page.getByRole('checkbox', { name: item }).waitFor();
 
-    // Assert
-    await test.step('ダイアログ上で税率が8%になり、税込金額が330円から324円に再計算される', async () => {
-      await expect(
-        page.getByRole('button', { name: '台所用洗剤の税率: 8%（タップで切り替え）' }),
-      ).toBeVisible();
-      await expect(page.getByText('¥324')).toBeVisible();
+      // Act — 対象明細の税率を切り替えてから全明細を追加する
+      await page.getByRole('button', { name: `${item}の税率: ${from}%（タップで切り替え）` }).click();
+
+      // Assert
+      await test.step(`ダイアログ上で税率が${to}%になり、税込金額が${after}に再計算される`, async () => {
+        await expect(
+          page.getByRole('button', { name: `${item}の税率: ${to}%（タップで切り替え）` }),
+        ).toBeVisible();
+        await expect(page.getByText(after)).toBeVisible();
+      });
+
+      await page.getByRole('button', { name: '3件を追加' }).click();
+      await page.getByRole('dialog', { name: 'レシートから追加' }).waitFor({ state: 'hidden' });
+      await page.reload();
+      await page.getByRole('tab', { name: '妻' }).waitFor();
+
+      await test.step(`再計算後の${after}で支出に登録されている`, async () => {
+        await expect(
+          page.getByRole('button', { name: new RegExp(`${item}.*${after}`) }),
+        ).toBeVisible();
+      });
     });
-
-    await page.getByRole('button', { name: '3件を追加' }).click();
-    await page.getByRole('dialog', { name: 'レシートから追加' }).waitFor({ state: 'hidden' });
-    await page.reload();
-    await page.getByRole('tab', { name: '妻' }).waitFor();
-
-    await test.step('再計算後の324円で支出に登録されている', async () => {
-      await expect(page.getByRole('button', { name: /台所用洗剤.*¥324/ })).toBeVisible();
-    });
-  });
+  }
 
   test('税率が読み取れなかった明細は、税率を選んでから支出に追加できる', async ({ page }) => {
     // Arrange
