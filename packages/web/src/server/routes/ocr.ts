@@ -4,7 +4,8 @@ const router: ReturnType<typeof Router> = Router();
 
 const MODEL = 'gpt-4o-mini';
 
-export type ReceiptItem = { name: string; taxRate: number; amount: number };
+// taxRate が null のときは税率を判定できなかった明細。クライアント側でユーザが選び直す（要確認）。
+export type ReceiptItem = { name: string; taxRate: number | null; amount: number };
 
 type OcrParsed = {
   store: string | null;
@@ -50,10 +51,17 @@ function httpError(message: string, status: number): Error {
 }
 
 // テスト用スタブ: OPENAI_API_KEY 未設定の非本番環境でOpenAIを呼ばずに決定論的な結果を返す。
-// filename に "no-tax" を含む場合は税率エラーを再現する。
+// filename に "no-tax" を含む場合は税率が判定できなかったケース（要確認）を再現する。
 function stubResult(filename: string): OcrParsed {
   if (filename.includes('no-tax')) {
-    return { store: null, taxRatesReadable: false, items: [] };
+    return {
+      store: 'テストスーパー',
+      taxRatesReadable: false,
+      items: [
+        { name: '牛乳', taxRate: 0.08, taxIncludedPrice: 216 },
+        { name: 'お茶', taxRate: 0.1, taxIncludedPrice: 150 },
+      ],
+    };
   }
   return {
     store: 'テストスーパー',
@@ -140,13 +148,14 @@ router.post('/receipt', async (req: Request, res: Response, next: NextFunction) 
       parsed = await callOpenAI(apiKey, image);
     }
 
-    if (!parsed.taxRatesReadable || parsed.items.length === 0) {
-      throw httpError('税率が読み取れませんでした', 422);
+    if (parsed.items.length === 0) {
+      throw httpError('レシートから明細を読み取れませんでした', 422);
     }
 
+    // 税率を判定できなかった場合は taxRate を null にして返し、ユーザが確認ダイアログで選べるようにする。
     const items: ReceiptItem[] = parsed.items.map((it) => ({
       name: it.name,
-      taxRate: it.taxRate,
+      taxRate: parsed.taxRatesReadable ? it.taxRate : null,
       amount: Math.round(it.taxIncludedPrice),
     }));
     res.json({ store: parsed.store ?? null, items });

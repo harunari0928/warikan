@@ -42,10 +42,11 @@ x = (A + Q - B - P) / 2
 FAB「＋」→「レシートを撮影」でカメラ起動 → 画像を `POST /api/ocr/receipt` に送信し、OpenAI `gpt-4o-mini`（画像 + Structured Outputs）で明細を抽出する。
 
 - リクエスト: `{ image: dataURL, filename?: string }`。クライアントは canvas で長辺1500pxへ縮小・JPEG化して送る（`resizeImageToDataUrl`）。
-- 各品目の税率(0.08/0.10)を判定し**税込整数円**で返す。税率が判定できなければ 422 `税率が読み取れませんでした` を返す（要件）。
-- レスポンス: `{ store, items: [{ name, taxRate, amount }] }`。ユーザがチェックで取捨選択し、選んだ品目を既存の `POST /api/months/:yyyymm/expenses` に1件ずつ登録する（新規書き込みAPIは増やさない）。
+- 各品目の税率(0.08/0.10)を判定し**税込整数円**で返す。**税率が判定できなかった場合は `taxRate: null`（要確認）で返し**、明細自体が1件も取れないときだけ 422 `レシートから明細を読み取れませんでした` を返す。
+- レスポンス: `{ store, items: [{ name, taxRate: number | null, amount }] }`。ユーザがチェックで取捨選択し、選んだ品目を既存の `POST /api/months/:yyyymm/expenses` に1件ずつ登録する（新規書き込みAPIは増やさない）。
+- **確認ダイアログで税率を編集できる**（`ReceiptScanDialog.tsx`）。税率バッジはタップで 8% ⇔ 10% を切り替えるボタン。`taxRate: null` の明細は amber の「税率を選択」で表示し、選ぶまで追加ボタンは非活性。税率を変えると税込金額を再計算する（不変の `baseAmount`/`baseRate` から `round(baseAmount / (1+baseRate) * (1+newRate))`。要確認の明細は最初に選んだ税率を基準として採用し金額は変えない）。
 - 実装は `packages/web/src/server/routes/ocr.ts`。OpenAI SDK は使わず標準 `fetch` で REST を叩く（依存追加・Docker build への影響なし）。
-- **テスト/スタブ**: `NODE_ENV!=='production'` かつ `OPENAI_API_KEY` 未設定なら OpenAI を呼ばず決定論的フィクスチャを返す。`filename` に `no-tax` を含めば税率エラーを再現。CI はキー不要。
+- **テスト/スタブ**: `NODE_ENV!=='production'` かつ `OPENAI_API_KEY` 未設定なら OpenAI を呼ばず決定論的フィクスチャを返す。`filename` に `no-tax` を含めば税率が判定できなかったケース（要確認）を再現。CI はキー不要。
 
 ## Development
 
