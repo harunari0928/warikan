@@ -2,16 +2,21 @@ import { useEffect, useState } from 'react';
 import type { FixedTemplate, User } from '../types.js';
 import { formatYen } from '../utils.js';
 import AmountInput from './AmountInput.js';
+import { useToast } from './Toast.js';
 
 type Props = {
   users: User[];
   onBack: () => void;
 };
 
+const SAVE_ERROR_MSG = '保存に失敗しました。通信環境を確認してください';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
 export default function FixedTemplateAdmin({ users, onBack }: Props) {
   const [templates, setTemplates] = useState<FixedTemplate[]>([]);
   const [editing, setEditing] = useState<FixedTemplate | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const toast = useToast();
 
   const fetchTemplates = async () => {
     const res = await fetch('/api/fixed-expense-templates');
@@ -22,29 +27,67 @@ export default function FixedTemplateAdmin({ users, onBack }: Props) {
     fetchTemplates();
   }, []);
 
-  const handleSubmit = async (values: TemplateFormValues) => {
-    if (editing) {
-      await fetch(`/api/fixed-expense-templates/${editing.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
-    } else {
-      await fetch('/api/fixed-expense-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+  // 楽観的に一覧を更新 → API。失敗したら直前の一覧へロールバックしトーストで通知する。
+  const runTemplateMutation = async (optimistic: FixedTemplate[], request: () => Promise<Response>) => {
+    const prev = templates;
+    setTemplates(optimistic);
+    try {
+      const res = await request();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchTemplates();
+    } catch {
+      setTemplates(prev);
+      toast.error(SAVE_ERROR_MSG);
     }
+  };
+
+  const handleSubmit = async (values: TemplateFormValues) => {
+    const target = editing;
+
+    // 楽観的反映と同時にフォームを閉じ、ユーザーを待たせない。失敗時はロールバックされる。
     setShowForm(false);
     setEditing(null);
-    await fetchTemplates();
+
+    if (target) {
+      await runTemplateMutation(
+        templates.map((t) =>
+          t.id === target.id ? { ...t, ...values, is_active: values.is_active ? 1 : 0 } : t,
+        ),
+        () =>
+          fetch(`/api/fixed-expense-templates/${target.id}`, {
+            method: 'PATCH',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(values),
+          }),
+      );
+    } else {
+      const optimistic: FixedTemplate = {
+        id: -Date.now(),
+        user_id: values.user_id,
+        description: values.description,
+        amount: values.amount,
+        note: values.note,
+        is_active: values.is_active ? 1 : 0,
+        display_order: Number.MAX_SAFE_INTEGER,
+      };
+      await runTemplateMutation(
+        [...templates, optimistic],
+        () =>
+          fetch('/api/fixed-expense-templates', {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(values),
+          }),
+      );
+    }
   };
 
   const handleDelete = async (t: FixedTemplate) => {
     if (!window.confirm(`「${t.description}」を削除しますか？`)) return;
-    await fetch(`/api/fixed-expense-templates/${t.id}`, { method: 'DELETE' });
-    await fetchTemplates();
+    await runTemplateMutation(
+      templates.filter((x) => x.id !== t.id),
+      () => fetch(`/api/fixed-expense-templates/${t.id}`, { method: 'DELETE' }),
+    );
   };
 
   return (

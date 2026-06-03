@@ -1,6 +1,23 @@
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 const API = 'http://localhost:3121';
+
+/** 保存失敗時にトーストへ表示されるメッセージ（部分一致で検証する用）。 */
+export const SAVE_ERROR_TOAST = '保存に失敗しました';
+
+/**
+ * 指定したメソッド・URLのリクエストだけをサーバエラー(500)に差し替える。
+ * それ以外（画面表示に必要なGET等）はそのまま通す。
+ */
+export async function failApi(page: Page, urlGlob: string, method: string): Promise<void> {
+  await page.route(urlGlob, (route) => {
+    if (route.request().method() === method) {
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' });
+    } else {
+      route.continue();
+    }
+  });
+}
 
 export async function resetDb(request: APIRequestContext): Promise<void> {
   await request.post(`${API}/api/test/reset`);
@@ -34,6 +51,11 @@ export async function setIncome(
   await request.put(`${API}/api/months/${yyyymm}/incomes/${userId}`, {
     data: { amount },
   });
+}
+
+export async function closeMonth(request: APIRequestContext, yyyymm: string): Promise<void> {
+  await ensureMonth(request, yyyymm);
+  await request.post(`${API}/api/months/${yyyymm}/close`);
 }
 
 export async function addExpense(

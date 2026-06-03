@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { resetDb, seedUsers, addExpense, setIncome, TEST_MONTH } from './helpers.js';
+import {
+  resetDb,
+  seedUsers,
+  addExpense,
+  setIncome,
+  closeMonth,
+  failApi,
+  SAVE_ERROR_TOAST,
+  TEST_MONTH,
+} from './helpers.js';
 
 test.describe('月の締めとロック', () => {
   test('月を締めると支出の追加・編集ができなくなる', async ({ page, request }) => {
@@ -151,6 +160,81 @@ test.describe('精算不要の月は締めると自動で精算済みになる',
     await test.step('操作しなくても精算済みとして表示される', async () => {
       await expect(page.getByRole('checkbox', { name: '精算済み' })).toBeChecked();
       await expect(page.getByText(/精算済み \(/)).toBeVisible();
+    });
+  });
+});
+
+test.describe('月の締め・精算済み操作中にAPIエラーが起きたとき', () => {
+  test('締める操作が失敗するとエラーが通知され、締められていない状態に戻る', async ({ page, request }) => {
+    // Arrange: 未締めの月を開き、締めリクエストを失敗させる
+    await resetDb(request);
+    await seedUsers(request);
+    await page.goto('/');
+    await page.getByRole('button', { name: '月を締める' }).waitFor();
+    await failApi(page, '**/api/months/*/close', 'POST');
+
+    // Act: 月を締めようとする
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '月を締める' }).click();
+
+    // Assert
+    await test.step('エラーが通知される', async () => {
+      await expect(page.getByText(SAVE_ERROR_TOAST)).toBeVisible();
+    });
+
+    await test.step('締め済にならず、月を締めるボタンのまま戻る', async () => {
+      await expect(page.getByText('締め済')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '月を締める' })).toBeVisible();
+    });
+  });
+
+  test('解除が失敗するとエラーが通知され、締め済みのまま戻る', async ({ page, request }) => {
+    // Arrange: 締め済みの月を開き、解除リクエストを失敗させる
+    await resetDb(request);
+    await seedUsers(request);
+    await closeMonth(request, TEST_MONTH);
+    await page.goto('/');
+    await page.getByRole('button', { name: '締めを解除' }).waitFor();
+    await failApi(page, '**/api/months/*/open', 'POST');
+
+    // Act: 締めを解除しようとする
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '締めを解除' }).click();
+
+    // Assert
+    await test.step('エラーが通知される', async () => {
+      await expect(page.getByText(SAVE_ERROR_TOAST)).toBeVisible();
+    });
+
+    await test.step('締め済のまま、締めを解除ボタンが残る', async () => {
+      await expect(page.getByText('締め済')).toBeVisible();
+      await expect(page.getByRole('button', { name: '締めを解除' })).toBeVisible();
+    });
+  });
+
+  test('精算済みの記録が失敗するとエラーが通知され、チェックが外れた状態に戻る', async ({ page, request }) => {
+    // Arrange: 妻40万・夫30万（夫が送金される側）の締め済みの月で、精算済みの保存を失敗させる
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 400000);
+    await setIncome(request, TEST_MONTH, husband, 300000);
+    await closeMonth(request, TEST_MONTH);
+    await page.goto('/');
+    await page.getByText('締め済').waitFor();
+    await failApi(page, '**/api/months/*/settlement-paid', 'PUT');
+
+    // Act: 送金される側の夫に切り替えて精算済みにチェックしようとする
+    await page.getByRole('tab', { name: '夫' }).click();
+    const checkbox = page.getByRole('checkbox', { name: '精算済み' });
+    await checkbox.click();
+
+    // Assert
+    await test.step('エラーが通知される', async () => {
+      await expect(page.getByText(SAVE_ERROR_TOAST)).toBeVisible();
+    });
+
+    await test.step('精算済みのチェックは外れたまま戻る', async () => {
+      await expect(checkbox).not.toBeChecked();
     });
   });
 });
