@@ -28,6 +28,11 @@ export default function SummaryCard({
   const toUser = users.find((u) => u.id === settlement.toUserId);
   const settled = settlement.amount === 0;
 
+  // 精算済みは「送金される側（お金を受け取る人）」だけが操作できる。
+  // 精算不要（送金なし）のときは受け取る人がいないため、誰でも操作できる。
+  const isReceiver = currentUserId === settlement.toUserId;
+  const canMarkPaid = month.is_closed && (settled || isReceiver);
+
   const paidPanelClass = month.settlement_paid
     ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-900'
     : 'bg-slate-50 border-slate-200 dark:bg-slate-800/50 dark:border-slate-700';
@@ -93,22 +98,22 @@ export default function SummaryCard({
         )}
         <label
           className={`flex items-center gap-2 text-sm select-none ${
-            month.is_closed ? 'cursor-pointer' : 'cursor-not-allowed'
+            canMarkPaid ? 'cursor-pointer' : 'cursor-not-allowed'
           }`}
         >
           <input
             type="checkbox"
             checked={month.settlement_paid}
-            disabled={!month.is_closed}
+            disabled={!canMarkPaid}
             onChange={(e) => onPaidChange(e.target.checked)}
             className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500 disabled:opacity-40"
           />
           <span
             className={
-              !month.is_closed
-                ? 'text-slate-400 dark:text-slate-500'
-                : month.settlement_paid
-                  ? 'text-emerald-700 dark:text-emerald-300 font-medium'
+              month.settlement_paid
+                ? 'text-emerald-700 dark:text-emerald-300 font-medium'
+                : !canMarkPaid
+                  ? 'text-slate-400 dark:text-slate-500'
                   : 'text-slate-700 dark:text-slate-200'
             }
           >
@@ -119,6 +124,10 @@ export default function SummaryCard({
           </span>
           {!month.is_closed ? (
             <span className="text-xs text-slate-400 dark:text-slate-500">（月を締めると操作できます）</span>
+          ) : !isReceiver && !settled && !month.settlement_paid ? (
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              （{toUser?.name}さんが操作できます）
+            </span>
           ) : null}
         </label>
       </div>

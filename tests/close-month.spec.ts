@@ -84,3 +84,49 @@ test.describe('月の締めとロック', () => {
     });
   });
 });
+
+test.describe('精算済みは送金される側だけが操作できる', () => {
+  // 妻40万・夫30万・支出なし → 妻が夫に5万送金。夫が「送金される側」になる。
+  test.beforeEach(async ({ request }) => {
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 400000);
+    await setIncome(request, TEST_MONTH, husband, 300000);
+  });
+
+  test('送金される側（夫）は精算済みにできる', async ({ page }) => {
+    // Arrange: 月を締める
+    await page.goto('/');
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '月を締める' }).click();
+    await page.getByText('締め済').waitFor();
+
+    // Act: 送金される側の夫に切り替えて精算済みにチェックする
+    await page.getByRole('tab', { name: '夫' }).click();
+    const checkbox = page.getByRole('checkbox', { name: '精算済み' });
+    await checkbox.click();
+
+    // Assert
+    await test.step('精算済みとして表示される', async () => {
+      await expect(checkbox).toBeChecked();
+      await expect(page.getByText(/精算済み \(/)).toBeVisible();
+    });
+  });
+
+  test('送金する側（妻）は精算済みにできない', async ({ page }) => {
+    // Arrange: 月を締める（初期表示は送金する側の妻）
+    await page.goto('/');
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '月を締める' }).click();
+    await page.getByText('締め済').waitFor();
+
+    // Assert
+    await test.step('精算済みのチェックを操作できない', async () => {
+      await expect(page.getByRole('checkbox', { name: '精算済み' })).toBeDisabled();
+    });
+
+    await test.step('夫が操作できる旨が案内される', async () => {
+      await expect(page.getByText('（夫さんが操作できます）')).toBeVisible();
+    });
+  });
+});
