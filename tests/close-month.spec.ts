@@ -130,3 +130,27 @@ test.describe('精算済みは送金される側だけが操作できる', () =>
     });
   });
 });
+
+test.describe('精算不要の月は締めると自動で精算済みになる', () => {
+  test('手取り同額で精算不要の月を締めると自動で精算済みになる', async ({ page, request }) => {
+    // Arrange: 手取り同額・支出なし → 精算不要
+    await resetDb(request);
+    const { wife, husband } = await seedUsers(request);
+    await setIncome(request, TEST_MONTH, wife, 300000);
+    await setIncome(request, TEST_MONTH, husband, 300000);
+
+    await page.goto('/');
+    await page.getByText('精算不要（同額）').waitFor();
+
+    // Act: 月を締める
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: '月を締める' }).click();
+    await page.getByText('締め済').waitFor();
+
+    // Assert
+    await test.step('操作しなくても精算済みとして表示される', async () => {
+      await expect(page.getByRole('checkbox', { name: '精算済み' })).toBeChecked();
+      await expect(page.getByText(/精算済み \(/)).toBeVisible();
+    });
+  });
+});
