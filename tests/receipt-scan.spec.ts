@@ -32,16 +32,14 @@ test.describe('レシートから明細を取り込む', () => {
   });
 
   // 税率を切り替えると、税抜に戻して新しい税率を掛け直した税込金額に再計算される。
-  // 8%→10%（牛乳: ¥216→¥220）と 10%→8%（台所用洗剤: ¥330→¥324）の両方向を確認する。
+  // 8%→10% と 10%→8% の両方向を確認する（品目・金額はテストデータで、仕様ではない）。
   const rateChangeCases = [
-    { item: '牛乳', from: 8, to: 10, before: '¥216', after: '¥220' },
-    { item: '台所用洗剤', from: 10, to: 8, before: '¥330', after: '¥324' },
+    { item: '牛乳', from: 8, to: 10, after: '¥220' },
+    { item: '台所用洗剤', from: 10, to: 8, after: '¥324' },
   ];
 
-  for (const { item, from, to, before, after } of rateChangeCases) {
-    test(`${item}の税率を${from}%から${to}%に変えると、税込金額が${before}から${after}に再計算されて登録される`, async ({
-      page,
-    }) => {
+  for (const { item, from, to, after } of rateChangeCases) {
+    test(`税率を${from}%から${to}%に変えると、税込金額が再計算されて登録される`, async ({ page }) => {
       // Arrange
       await page.goto('/');
       await page.getByRole('tab', { name: '妻' }).waitFor();
@@ -55,7 +53,7 @@ test.describe('レシートから明細を取り込む', () => {
       await page.getByRole('button', { name: `${item}の税率: ${from}%（タップで切り替え）` }).click();
 
       // Assert
-      await test.step(`ダイアログ上で税率が${to}%になり、税込金額が${after}に再計算される`, async () => {
+      await test.step('ダイアログ上で税率が切り替わり、税込金額が再計算される', async () => {
         await expect(
           page.getByRole('button', { name: `${item}の税率: ${to}%（タップで切り替え）` }),
         ).toBeVisible();
@@ -67,7 +65,7 @@ test.describe('レシートから明細を取り込む', () => {
       await page.reload();
       await page.getByRole('tab', { name: '妻' }).waitFor();
 
-      await test.step(`再計算後の${after}で支出に登録されている`, async () => {
+      await test.step('再計算後の金額で支出に登録されている', async () => {
         await expect(
           page.getByRole('button', { name: new RegExp(`${item}.*${after}`) }),
         ).toBeVisible();
