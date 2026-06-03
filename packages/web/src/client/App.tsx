@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { calculateSettlement } from '@warikan/shared';
 import Header from './components/Header.js';
 import SummaryCard from './components/SummaryCard.js';
 import ExpenseList from './components/ExpenseList.js';
 import ExpenseDialog from './components/ExpenseDialog.js';
 import CloseMonthButton from './components/CloseMonthButton.js';
 import FixedTemplateAdmin from './components/FixedTemplateAdmin.js';
+import { useToast } from './components/Toast.js';
 import { useUsers } from './hooks/useUsers.js';
 import { useCurrentUser } from './hooks/useCurrentUser.js';
 import { useMonth } from './hooks/useMonth.js';
@@ -14,8 +16,39 @@ import type { Expense, MonthSnapshot } from './types.js';
 
 type Page = 'home' | 'templates';
 
+const SAVE_ERROR_MSG = '保存に失敗しました。通信環境を確認してください';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
 function getPage(): Page {
   return window.location.hash === '#/templates' ? 'templates' : 'home';
+}
+
+/** 手取り・支出合計から精算結果をクライアント側で再計算する（楽観的更新で即座に反映するため）。 */
+function recomputeSettlement(
+  incomes: MonthSnapshot['incomes'],
+  perUserTotals: MonthSnapshot['settlement']['perUserTotals'],
+): MonthSnapshot['settlement'] {
+  if (incomes.length !== 2) {
+    return { amount: 0, fromUserId: null, toUserId: null, perUserTotals };
+  }
+  const totalOf = (userId: number) => perUserTotals.find((t) => t.user_id === userId)?.total ?? 0;
+  const [a, b] = incomes;
+  const result = calculateSettlement(
+    { userId: a.user_id, income: a.amount, expense: totalOf(a.user_id) },
+    { userId: b.user_id, income: b.amount, expense: totalOf(b.user_id) },
+  );
+  return { ...result, perUserTotals };
+}
+
+/** 支出一覧を差し替え、各人の支出合計と精算結果を再計算した snapshot を返す。 */
+function withExpenses(prev: MonthSnapshot, expenses: Expense[]): MonthSnapshot {
+  const perUserTotals = prev.settlement.perUserTotals.map((t) => ({
+    user_id: t.user_id,
+    total: expenses
+      .filter((e) => e.user_id === t.user_id)
+      .reduce((sum, e) => sum + e.amount, 0),
+  }));
+  return { ...prev, expenses, settlement: recomputeSettlement(prev.incomes, perUserTotals) };
 }
 
 export default function App() {
@@ -28,6 +61,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
+  const toast = useToast();
   const { theme, toggleTheme } = useTheme();
   const { users } = useUsers();
   const { currentUserId, selectUser } = useCurrentUser(users);
@@ -41,36 +75,80 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  const updateSnapshot = useCallback((updater: (prev: MonthSnapshot) => MonthSnapshot) => {
-    setSnapshot((prev) => (prev ? updater(prev) : prev));
-  }, [setSnapshot]);
+  // 楽観的に snapshot を更新 → API 呼び出し。失敗したら直前の状態へロールバックしトーストで通知する。
+  // snapshot を返すエンドポイント（手取り・精算済み・締め/解除）用。
+  const runSnapshotMutation = async (
+    optimistic: (prev: MonthSnapshot) => MonthSnapshot,
+    request: () => Promise<Response>,
+  ) => {
+    const prev = snapshot;
+    if (prev) setSnapshot(optimistic(prev));
+    try {
+      const res = await request();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSnapshot(await res.json());
+    } catch {
+      setSnapshot(prev);
+      toast.error(SAVE_ERROR_MSG);
+    }
+  };
+
+  // 支出系エンドポイントは個別の行を返すため、成功後は refetch で真の状態に同期する。
+  const runExpenseMutation = async (
+    nextExpenses: (prev: MonthSnapshot) => Expense[],
+    request: () => Promise<Response>,
+  ) => {
+    const prev = snapshot;
+    if (prev) setSnapshot(withExpenses(prev, nextExpenses(prev)));
+    try {
+      const res = await request();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await refetch();
+    } catch {
+      setSnapshot(prev);
+      toast.error(SAVE_ERROR_MSG);
+    }
+  };
 
   const handleIncomeChange = async (userId: number, amount: number) => {
-    const res = await fetch(`/api/months/${yearMonth}/incomes/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
-    });
-    if (res.ok) setSnapshot(await res.json());
+    await runSnapshotMutation(
+      (prev) => {
+        const incomes = prev.incomes.map((i) => (i.user_id === userId ? { ...i, amount } : i));
+        return { ...prev, incomes, settlement: recomputeSettlement(incomes, prev.settlement.perUserTotals) };
+      },
+      () =>
+        fetch(`/api/months/${yearMonth}/incomes/${userId}`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ amount }),
+        }),
+    );
   };
 
   const handlePaidChange = async (paid: boolean) => {
-    const res = await fetch(`/api/months/${yearMonth}/settlement-paid`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paid }),
-    });
-    if (res.ok) setSnapshot(await res.json());
+    await runSnapshotMutation(
+      (prev) => ({ ...prev, month: { ...prev.month, settlement_paid: paid } }),
+      () =>
+        fetch(`/api/months/${yearMonth}/settlement-paid`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ paid }),
+        }),
+    );
   };
 
   const handleClose = async () => {
-    const res = await fetch(`/api/months/${yearMonth}/close`, { method: 'POST' });
-    if (res.ok) setSnapshot(await res.json());
+    await runSnapshotMutation(
+      (prev) => ({ ...prev, month: { ...prev.month, is_closed: true } }),
+      () => fetch(`/api/months/${yearMonth}/close`, { method: 'POST' }),
+    );
   };
 
   const handleOpen = async () => {
-    const res = await fetch(`/api/months/${yearMonth}/open`, { method: 'POST' });
-    if (res.ok) setSnapshot(await res.json());
+    await runSnapshotMutation(
+      (prev) => ({ ...prev, month: { ...prev.month, is_closed: false } }),
+      () => fetch(`/api/months/${yearMonth}/open`, { method: 'POST' }),
+    );
   };
 
   const handleSubmitExpense = async (values: {
@@ -78,38 +156,62 @@ export default function App() {
     amount: number;
     note: string;
   }) => {
-    if (currentUserId === null) return;
-    if (editingExpense) {
-      const res = await fetch(`/api/months/${yearMonth}/expenses/${editingExpense.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, note: values.note || null }),
-      });
-      if (!res.ok) return;
-    } else {
-      const res = await fetch(`/api/months/${yearMonth}/expenses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUserId,
-          description: values.description,
-          amount: values.amount,
-          note: values.note || null,
-        }),
-      });
-      if (!res.ok) return;
-    }
-    await refetch();
+    if (currentUserId === null || !snapshot) return;
+    const note = values.note || null;
+    const target = editingExpense;
+
+    // 楽観的反映と同時にダイアログを閉じ、ユーザーを待たせない。失敗時はロールバックされる。
     setDialogOpen(false);
     setEditingExpense(null);
+
+    if (target) {
+      await runExpenseMutation(
+        (prev) =>
+          prev.expenses.map((e) =>
+            e.id === target.id ? { ...e, description: values.description, amount: values.amount, note } : e,
+          ),
+        () =>
+          fetch(`/api/months/${yearMonth}/expenses/${target.id}`, {
+            method: 'PATCH',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ description: values.description, amount: values.amount, note }),
+          }),
+      );
+    } else {
+      const optimisticExpense: Expense = {
+        id: -Date.now(),
+        month_id: snapshot.month.id,
+        user_id: currentUserId,
+        description: values.description,
+        amount: values.amount,
+        note,
+        is_fixed: 0,
+        sort_order: Number.MAX_SAFE_INTEGER,
+        created_at: '',
+      };
+      await runExpenseMutation(
+        (prev) => [...prev.expenses, optimisticExpense],
+        () =>
+          fetch(`/api/months/${yearMonth}/expenses`, {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({
+              user_id: currentUserId,
+              description: values.description,
+              amount: values.amount,
+              note,
+            }),
+          }),
+      );
+    }
   };
 
   const handleDeleteExpense = async (expense: Expense) => {
     if (!window.confirm(`「${expense.description}」を削除しますか？`)) return;
-    const res = await fetch(`/api/months/${yearMonth}/expenses/${expense.id}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) await refetch();
+    await runExpenseMutation(
+      (prev) => prev.expenses.filter((e) => e.id !== expense.id),
+      () => fetch(`/api/months/${yearMonth}/expenses/${expense.id}`, { method: 'DELETE' }),
+    );
   };
 
   const isClosed = snapshot?.month.is_closed ?? false;
