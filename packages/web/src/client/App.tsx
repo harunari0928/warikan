@@ -158,6 +158,7 @@ export default function App() {
     description: string;
     amount: number;
     note: string;
+    userId: number;
   }) => {
     if (currentUserId === null || !snapshot) return;
     const note = values.note || null;
@@ -171,20 +172,33 @@ export default function App() {
       await runExpenseMutation(
         (prev) =>
           prev.expenses.map((e) =>
-            e.id === target.id ? { ...e, description: values.description, amount: values.amount, note } : e,
+            e.id === target.id
+              ? {
+                  ...e,
+                  user_id: values.userId,
+                  description: values.description,
+                  amount: values.amount,
+                  note,
+                }
+              : e,
           ),
         () =>
           fetch(`/api/months/${yearMonth}/expenses/${target.id}`, {
             method: 'PATCH',
             headers: JSON_HEADERS,
-            body: JSON.stringify({ description: values.description, amount: values.amount, note }),
+            body: JSON.stringify({
+              user_id: values.userId,
+              description: values.description,
+              amount: values.amount,
+              note,
+            }),
           }),
       );
     } else {
       const optimisticExpense: Expense = {
         id: -Date.now(),
         month_id: snapshot.month.id,
-        user_id: currentUserId,
+        user_id: values.userId,
         description: values.description,
         amount: values.amount,
         note,
@@ -199,7 +213,7 @@ export default function App() {
             method: 'POST',
             headers: JSON_HEADERS,
             body: JSON.stringify({
-              user_id: currentUserId,
+              user_id: values.userId,
               description: values.description,
               amount: values.amount,
               note,
@@ -360,6 +374,7 @@ export default function App() {
         open={dialogOpen}
         initial={editingExpense}
         userId={currentUserId}
+        users={users}
         onClose={() => {
           setDialogOpen(false);
           setEditingExpense(null);

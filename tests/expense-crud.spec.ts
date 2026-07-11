@@ -103,6 +103,42 @@ test.describe('支出CRUD', () => {
   });
 });
 
+test.describe('支出の担当を変更する', () => {
+  test.beforeEach(async ({ request, page }) => {
+    await resetDb(request);
+    await seedUsers(request);
+    await page.addInitScript(() => {
+      window.localStorage.removeItem('warikan.currentUserId');
+    });
+  });
+
+  test('編集で担当を夫に変えると、夫の明細に移動する', async ({ page }) => {
+    // Arrange: 妻として食費の支出を1件追加する
+    await page.goto('/');
+    await page.getByRole('button', { name: '支出を追加' }).click();
+    await page.getByRole('button', { name: '手入力で追加' }).click();
+    await page.getByRole('textbox', { name: '説明' }).fill('食費');
+    await page.getByRole('textbox', { name: '金額' }).fill('5000');
+    await page.getByRole('button', { name: '追加', exact: true }).click();
+    await page.getByRole('button', { name: /食費/ }).waitFor();
+
+    // Act: 編集ダイアログで担当を夫に切り替えて保存する
+    await page.getByRole('button', { name: /食費/ }).click();
+    await page.getByRole('radio', { name: '夫' }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+
+    // Assert
+    await test.step('妻の明細からは消える', async () => {
+      await expect(page.getByRole('button', { name: /食費/ })).toBeHidden();
+    });
+
+    await test.step('夫の明細に表示される', async () => {
+      await page.getByRole('tab', { name: '夫' }).click();
+      await expect(page.getByRole('button', { name: /食費/ })).toBeVisible();
+    });
+  });
+});
+
 test.describe('支出操作中にAPIエラーが起きたとき', () => {
   test('追加が失敗するとエラーが通知され、明細に追加されない', async ({ page, request }) => {
     // Arrange: 妻の支出が1件ある状態で開き、追加リクエストを失敗させる
