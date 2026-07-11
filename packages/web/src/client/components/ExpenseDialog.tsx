@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Expense } from '../types.js';
+import type { Expense, User } from '../types.js';
 import AmountInput from './AmountInput.js';
 import {
   DEFAULT_FIELD_ORDER,
@@ -11,23 +11,39 @@ export type ExpenseDialogValues = {
   description: string;
   amount: number;
   note: string;
+  userId: number;
 };
 
 type Props = {
   open: boolean;
   initial: Expense | null;
   userId: number | null;
+  users: User[];
   onClose: () => void;
   onSubmit: (values: ExpenseDialogValues) => Promise<void>;
 };
 
+/** 所属切替ボタンのユーザーごとの色（UserSwitcher と揃える）。 */
+const OWNER_THEMES = [
+  { dot: 'bg-rose-500', active: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-200' },
+  { dot: 'bg-sky-500', active: 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200' },
+];
+
 /** この距離を超えて縦に動かしたら「説明」と「金額」を入れ替える。 */
 const SWAP_THRESHOLD_PX = 36;
 
-export default function ExpenseDialog({ open, initial, userId, onClose, onSubmit }: Props) {
+export default function ExpenseDialog({
+  open,
+  initial,
+  userId,
+  users,
+  onClose,
+  onSubmit,
+}: Props) {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState('');
+  const [ownerId, setOwnerId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [order, setOrder] = useExpenseFieldOrder(userId);
@@ -43,19 +59,20 @@ export default function ExpenseDialog({ open, initial, userId, onClose, onSubmit
       setDescription(initial?.description ?? '');
       setAmount(initial?.amount ?? 0);
       setNote(initial?.note ?? '');
+      setOwnerId(initial?.user_id ?? userId);
       setSubmitting(false);
     }
-  }, [open, initial]);
+  }, [open, initial, userId]);
 
   if (!open) return null;
 
-  const canSubmit = description.trim() !== '' && amount > 0 && !submitting;
+  const canSubmit = description.trim() !== '' && amount > 0 && ownerId !== null && !submitting;
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || ownerId === null) return;
     setSubmitting(true);
     try {
-      await onSubmit({ description: description.trim(), amount, note });
+      await onSubmit({ description: description.trim(), amount, note, userId: ownerId });
     } finally {
       setSubmitting(false);
     }
@@ -176,6 +193,39 @@ export default function ExpenseDialog({ open, initial, userId, onClose, onSubmit
           </div>
 
           <div className="space-y-4">
+            {initial ? (
+              <div>
+                <span className="text-xs text-slate-600 dark:text-slate-400">誰の支出</span>
+                <div
+                  className="mt-1 inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1"
+                  role="radiogroup"
+                  aria-label="誰の支出"
+                >
+                  {users.map((u, idx) => {
+                    const isActive = u.id === ownerId;
+                    const theme = OWNER_THEMES[idx % OWNER_THEMES.length];
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        onClick={() => setOwnerId(u.id)}
+                        className={`min-h-10 px-3 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                          isActive
+                            ? `${theme.active} shadow-sm`
+                            : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${theme.dot}`} aria-hidden />
+                        {u.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             {order.map((key) => renderField(key))}
 
             <label className="block">

@@ -184,14 +184,14 @@ router.patch('/:yyyymm/expenses/:id', (req: Request, res: Response, next: NextFu
   const ym = ymOr400(req, res);
   if (!ym) return;
   const id = Number(req.params.id);
-  const { description, amount, note } = req.body ?? {};
+  const { description, amount, note, user_id } = req.body ?? {};
   try {
     const db = getDb();
     const month = getMonthRowOr404(db, ym);
     ensureMonthOpen(month);
     const existing = db
       .prepare('SELECT * FROM expenses WHERE id = ? AND month_id = ?')
-      .get(id, month.id);
+      .get(id, month.id) as { user_id: number } | undefined;
     if (!existing) {
       res.status(404).json({ error: 'expense not found' });
       return;
@@ -209,6 +209,18 @@ router.patch('/:yyyymm/expenses/:id', (req: Request, res: Response, next: NextFu
     if (note !== undefined) {
       fields.push('note = ?');
       params.push(note);
+    }
+    // 所属ユーザーを変更するときは、移動先ユーザーのリスト末尾へ並べ替える。
+    if (Number.isInteger(user_id) && user_id !== existing.user_id) {
+      const { m: maxOrder } = db
+        .prepare(
+          'SELECT COALESCE(MAX(sort_order), -1) AS m FROM expenses WHERE month_id = ? AND user_id = ?',
+        )
+        .get(month.id, user_id) as { m: number };
+      fields.push('user_id = ?');
+      params.push(user_id);
+      fields.push('sort_order = ?');
+      params.push(maxOrder + 1);
     }
     if (fields.length === 0) {
       res.status(400).json({ error: 'no updatable fields' });
