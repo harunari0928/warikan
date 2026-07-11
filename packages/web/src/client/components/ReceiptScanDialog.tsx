@@ -1,25 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatYen, resizeImageToDataUrl } from '../utils.js';
 
-// taxRate is null when OCR could not determine it (要確認). amount は税込整数円。
-type ScannedItem = { name: string; taxRate: number | null; amount: number };
+// AI はレシートに印字された金額をそのまま読み取る。税率は判定しない。
+type ScannedItem = { name: string; amount: number };
 
-// レビュー用に保持する明細。baseAmount/baseRate は不変の基準値で、
-// 税率を切り替えるたびに「税抜に戻して新税率を掛け直す」ことで再計算する（丸め誤差の累積を防ぐ）。
+// レビュー用に保持する明細。baseAmount は読み取った金額（不変）。
+// rate が null のあいだは読取値をそのまま使い、8%/10% を選ぶとその税率で税込を計算する。
 type ReviewItem = {
   name: string;
   baseAmount: number;
-  baseRate: number | null;
   rate: number | null;
 };
 
 const REDUCED = 0.08; // 軽減税率
 const STANDARD = 0.1; // 標準税率
 
-// 現在の税率に基づく税込金額。未設定(要確認)のあいだは読み取った金額をそのまま使う。
+// 現在の税率に基づく金額。未選択(null)のあいだは読み取った金額をそのまま使う。
 function displayAmount(item: ReviewItem): number {
-  if (item.rate === null || item.baseRate === null) return item.baseAmount;
-  return Math.round((item.baseAmount / (1 + item.baseRate)) * (1 + item.rate));
+  if (item.rate === null) return item.baseAmount;
+  return Math.round(item.baseAmount * (1 + item.rate));
 }
 
 type Phase = 'capture' | 'loading' | 'review' | 'error';
@@ -78,8 +77,7 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
         data.items.map((it) => ({
           name: it.name,
           baseAmount: it.amount,
-          baseRate: it.taxRate,
-          rate: it.taxRate,
+          rate: null,
         })),
       );
       setSelected(data.items.map(() => true));
@@ -94,17 +92,10 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
     setSelected((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
   };
 
-  // 税率バッジのタップ: 未設定なら軽減税率を採用（その税率を基準として確定し金額は変えない）、
-  // 以降は 8% ⇔ 10% を切り替える。
-  const cycleRate = (i: number) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== i) return item;
-        if (item.rate === null) return { ...item, rate: REDUCED, baseRate: REDUCED };
-        const next = item.rate === REDUCED ? STANDARD : REDUCED;
-        return { ...item, rate: next };
-      }),
-    );
+  // 税率を直接選ぶ: なし(読取値のまま) / 8% / 10%。
+  // 税率を選ぶと読取値にその税率を掛けた税込金額を表示する。
+  const setRate = (i: number, value: number | null) => {
+    setItems((prev) => prev.map((item, idx) => (idx === i ? { ...item, rate: value } : item)));
   };
 
   const selectedCount = selected.filter(Boolean).length;
@@ -116,11 +107,9 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
     (sum, item, i) => (selected[i] ? sum + displayAmount(item) : sum),
     0,
   );
-  const hasUnresolved = items.some((it) => it.rate === null);
-  const hasUnresolvedSelected = items.some((it, i) => selected[i] && it.rate === null);
 
   const handleAdd = async () => {
-    if (userId === null || selectedCount === 0 || submitting || hasUnresolvedSelected) return;
+    if (userId === null || selectedCount === 0 || submitting) return;
     setSubmitting(true);
     try {
       const chosen = items.filter((_, i) => selected[i]);
@@ -187,7 +176,7 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
                 🧾
               </div>
               <p className="mt-4 text-sm text-slate-600 leading-relaxed max-w-[16rem]">
-                レシートを撮影すると、品目と金額を自動で読み取って一覧にします。
+                レシートを撮影すると、品目と金額を読み取って一覧にします。
               </p>
               <button
                 type="button"
@@ -196,7 +185,7 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
               >
                 レシートを撮影
               </button>
-              <p className="mt-2 text-xs text-slate-400">読み取った明細はあとから選べます</p>
+              <p className="mt-2 text-xs text-slate-400">消費税は品目ごとにあとから選べます</p>
             </div>
           ) : null}
 
@@ -233,12 +222,9 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
                 ) : null}
               </div>
 
-              {hasUnresolved ? (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-3 py-2 text-xs leading-5">
-                  <span className="shrink-0" aria-hidden>⚠️</span>
-                  <span>税率が読み取れなかった明細があります。税率を選んでください。</span>
-                </div>
-              ) : null}
+              <p className="text-xs text-slate-500 leading-5">
+                税率を選ぶと消費税を計算します。「なし」は読み取った金額のまま。
+              </p>
 
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs text-slate-500 tabular-nums">
@@ -275,7 +261,11 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
                           {item.name}
                         </span>
                       </label>
-                      <TaxRateButton item={item} checked={checked} onCycle={() => cycleRate(i)} />
+                      <TaxRateSegment
+                        item={item}
+                        checked={checked}
+                        onSelect={(value) => setRate(i, value)}
+                      />
                       <span
                         className={`text-sm tabular-nums shrink-0 w-16 text-right ${
                           checked ? 'text-slate-900' : 'text-slate-400'
@@ -306,7 +296,7 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
                 <button
                   type="button"
                   onClick={handleAdd}
-                  disabled={selectedCount === 0 || submitting || userId === null || hasUnresolvedSelected}
+                  disabled={selectedCount === 0 || submitting || userId === null}
                   className="flex-1 min-h-11 px-5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 active:bg-slate-950 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
                   {selectedCount}件を追加
@@ -320,56 +310,49 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
   );
 }
 
-// 税率バッジ。タップで 8% ⇔ 10% を切り替える。未設定(要確認)は amber で目立たせる。
-function TaxRateButton({
+// 税率セグメント。なし / 8% / 10% を直接選択する。
+function TaxRateSegment({
   item,
   checked,
-  onCycle,
+  onSelect,
 }: {
   item: ReviewItem;
   checked: boolean;
-  onCycle: () => void;
+  onSelect: (value: number | null) => void;
 }) {
-  const base =
-    'inline-flex items-center gap-0.5 shrink-0 min-h-11 px-2 -my-2 rounded-md border text-[11px] font-semibold tabular-nums transition-colors active:scale-[0.97]';
-
-  if (item.rate === null) {
-    return (
-      <button
-        type="button"
-        onClick={onCycle}
-        aria-label={`${item.name}の税率: 未設定（タップで選択）`}
-        className={`${base} ${
-          checked
-            ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
-            : 'border-amber-200 bg-amber-50/60 text-amber-600 hover:bg-amber-100'
-        }`}
-      >
-        <span aria-hidden>⚠</span>
-        税率を選択
-      </button>
-    );
-  }
-
-  const pct = Math.round(item.rate * 100);
-  const reduced = item.rate === REDUCED;
-  const tone = !checked
-    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100'
-    : reduced
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-      : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200';
+  const options: { value: number | null; label: string; aria: string }[] = [
+    { value: null, label: 'なし', aria: `${item.name}を税なしにする` },
+    { value: REDUCED, label: '8%', aria: `${item.name}を8%にする` },
+    { value: STANDARD, label: '10%', aria: `${item.name}を10%にする` },
+  ];
 
   return (
-    <button
-      type="button"
-      onClick={onCycle}
-      aria-label={`${item.name}の税率: ${pct}%（タップで切り替え）`}
-      className={`${base} ${tone}`}
+    <div
+      role="group"
+      aria-label={`${item.name}の税率`}
+      className={`inline-flex shrink-0 min-w-[7.5rem] rounded-lg border p-0.5 gap-0.5 ${
+        checked ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50 opacity-50'
+      }`}
     >
-      {pct}%
-      <span className="text-[9px] opacity-50" aria-hidden>
-        ⇄
-      </span>
-    </button>
+      {options.map((opt) => {
+        const pressed = item.rate === opt.value;
+        return (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => onSelect(opt.value)}
+            aria-label={opt.aria}
+            aria-pressed={pressed}
+            className={`flex-1 min-h-11 rounded-md text-[11px] font-semibold tabular-nums transition-colors ${
+              pressed
+                ? 'bg-slate-900 text-white'
+                : 'bg-transparent text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
