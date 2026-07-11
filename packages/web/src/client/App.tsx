@@ -359,6 +359,7 @@ export default function App() {
       <ExpenseDialog
         open={dialogOpen}
         initial={editingExpense}
+        userId={currentUserId}
         onClose={() => {
           setDialogOpen(false);
           setEditingExpense(null);
