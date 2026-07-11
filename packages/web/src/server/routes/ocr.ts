@@ -2,25 +2,23 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 
 const router: ReturnType<typeof Router> = Router();
 
-const MODEL = 'gpt-4o-mini';
+const MODEL = 'gpt-5.4-mini';
 
-// taxRate が null のときは税率を判定できなかった明細。クライアント側でユーザが選び直す（要確認）。
-export type ReceiptItem = { name: string; taxRate: number | null; amount: number };
+// AI は品目名と「レシートに印字された金額」だけを読み取る。
+// 税率の判定はしない（軽減/標準の判断は精度が出ないため、ユーザが画面で選ぶ）。
+export type ReceiptItem = { name: string; amount: number };
 
 type OcrParsed = {
   store: string | null;
-  taxRatesReadable: boolean;
-  items: { name: string; taxRate: number; taxIncludedPrice: number }[];
+  items: { name: string; amount: number }[];
 };
 
 const SYSTEM_PROMPT = `あなたは日本のスーパーやコンビニのレシート画像を解析するアシスタントです。
 画像から購入品目を1行ずつ抽出し、次のルールで JSON を返してください。
 
-- items: 購入した商品ごとに { name: 商品名, taxRate: 税率(0.08 または 0.10), taxIncludedPrice: 税込価格(整数, 円) } を列挙する。
-- 価格は必ず消費税込みの整数円にすること。レシートが税抜表示なら税率を掛けて税込に換算する。
-- 軽減税率(食料品など。※や*印が付くことが多い)は 0.08、それ以外は 0.10 とする。レシート下部の税区分別集計も手がかりにする。
+- items: 購入した商品ごとに { name: 商品名, amount: レシートに印字された金額(整数, 円) } を列挙する。
+- amount はレシートの品目行に印字されている金額をそのまま読み取ること。税率を掛けたり税込・税抜を換算したりせず、印字された数値をそのまま返す。
 - 小計・合計・お預り・お釣り・ポイント・値引き行など、購入品目でないものは含めない。
-- 各品目の税率を判定できない、または税率がレシートから読み取れない場合は taxRatesReadable を false にする。すべて判定できたら true。
 - store: 店舗名がわかれば入れる。不明なら null。`;
 
 const SCHEMA = {
@@ -28,7 +26,6 @@ const SCHEMA = {
   additionalProperties: false,
   properties: {
     store: { type: ['string', 'null'] },
-    taxRatesReadable: { type: 'boolean' },
     items: {
       type: 'array',
       items: {
@@ -36,14 +33,13 @@ const SCHEMA = {
         additionalProperties: false,
         properties: {
           name: { type: 'string' },
-          taxRate: { type: 'number' },
-          taxIncludedPrice: { type: 'integer' },
+          amount: { type: 'integer' },
         },
-        required: ['name', 'taxRate', 'taxIncludedPrice'],
+        required: ['name', 'amount'],
       },
     },
   },
-  required: ['store', 'taxRatesReadable', 'items'],
+  required: ['store', 'items'],
 };
 
 function httpError(message: string, status: number): Error {
@@ -51,25 +47,13 @@ function httpError(message: string, status: number): Error {
 }
 
 // テスト用スタブ: OPENAI_API_KEY 未設定の非本番環境でOpenAIを呼ばずに決定論的な結果を返す。
-// filename に "no-tax" を含む場合は税率が判定できなかったケース（要確認）を再現する。
-function stubResult(filename: string): OcrParsed {
-  if (filename.includes('no-tax')) {
-    return {
-      store: 'テストスーパー',
-      taxRatesReadable: false,
-      items: [
-        { name: '牛乳', taxRate: 0.08, taxIncludedPrice: 216 },
-        { name: 'お茶', taxRate: 0.1, taxIncludedPrice: 150 },
-      ],
-    };
-  }
+function stubResult(): OcrParsed {
   return {
     store: 'テストスーパー',
-    taxRatesReadable: true,
     items: [
-      { name: '牛乳', taxRate: 0.08, taxIncludedPrice: 216 },
-      { name: '食パン', taxRate: 0.08, taxIncludedPrice: 162 },
-      { name: '台所用洗剤', taxRate: 0.1, taxIncludedPrice: 330 },
+      { name: '牛乳', amount: 200 },
+      { name: '食パン', amount: 150 },
+      { name: '台所用洗剤', amount: 300 },
     ],
   };
 }
@@ -132,7 +116,7 @@ async function callOpenAI(apiKey: string, imageDataUrl: string): Promise<OcrPars
 }
 
 router.post('/receipt', async (req: Request, res: Response, next: NextFunction) => {
-  const { image, filename } = req.body ?? {};
+  const { image } = req.body ?? {};
   if (typeof image !== 'string' || !image.startsWith('data:image/')) {
     res.status(400).json({ error: 'image (data URL) is required' });
     return;
@@ -141,7 +125,7 @@ router.post('/receipt', async (req: Request, res: Response, next: NextFunction) 
     const apiKey = process.env.OPENAI_API_KEY;
     let parsed: OcrParsed;
     if (process.env.NODE_ENV !== 'production' && !apiKey) {
-      parsed = stubResult(typeof filename === 'string' ? filename : '');
+      parsed = stubResult();
     } else if (!apiKey) {
       throw httpError('OCRが利用できません (APIキー未設定)', 503);
     } else {
@@ -152,11 +136,9 @@ router.post('/receipt', async (req: Request, res: Response, next: NextFunction) 
       throw httpError('レシートから明細を読み取れませんでした', 422);
     }
 
-    // 税率を判定できなかった場合は taxRate を null にして返し、ユーザが確認ダイアログで選べるようにする。
     const items: ReceiptItem[] = parsed.items.map((it) => ({
       name: it.name,
-      taxRate: parsed.taxRatesReadable ? it.taxRate : null,
-      amount: Math.round(it.taxIncludedPrice),
+      amount: Math.round(it.amount),
     }));
     res.json({ store: parsed.store ?? null, items });
   } catch (e) {
