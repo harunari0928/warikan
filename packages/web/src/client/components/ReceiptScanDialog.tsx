@@ -92,16 +92,10 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
     setSelected((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
   };
 
-  // 税率ボタンのタップ: 未選択(読取値のまま) → 8% → 10% → 未選択 と循環する。
+  // 税率を直接選ぶ: なし(読取値のまま) / 8% / 10%。
   // 税率を選ぶと読取値にその税率を掛けた税込金額を表示する。
-  const cycleRate = (i: number) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== i) return item;
-        const next = item.rate === null ? REDUCED : item.rate === REDUCED ? STANDARD : null;
-        return { ...item, rate: next };
-      }),
-    );
+  const setRate = (i: number, value: number | null) => {
+    setItems((prev) => prev.map((item, idx) => (idx === i ? { ...item, rate: value } : item)));
   };
 
   const selectedCount = selected.filter(Boolean).length;
@@ -229,7 +223,7 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
               </div>
 
               <p className="text-xs text-slate-500 leading-5">
-                金額は読み取ったままです。税率ボタンを押すと消費税を計算します。
+                税率を選ぶと消費税を計算します。「なし」は読み取った金額のまま。
               </p>
 
               <div className="flex items-center justify-between px-1">
@@ -267,7 +261,11 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
                           {item.name}
                         </span>
                       </label>
-                      <TaxRateButton item={item} checked={checked} onCycle={() => cycleRate(i)} />
+                      <TaxRateSegment
+                        item={item}
+                        checked={checked}
+                        onSelect={(value) => setRate(i, value)}
+                      />
                       <span
                         className={`text-sm tabular-nums shrink-0 w-16 text-right ${
                           checked ? 'text-slate-900' : 'text-slate-400'
@@ -312,58 +310,49 @@ export default function ReceiptScanDialog({ open, yearMonth, userId, onClose, on
   );
 }
 
-// 税率バッジ。タップで 未選択(読取値のまま) → 8% → 10% → 未選択 と循環する。
-function TaxRateButton({
+// 税率セグメント。なし / 8% / 10% を直接選択する。
+function TaxRateSegment({
   item,
   checked,
-  onCycle,
+  onSelect,
 }: {
   item: ReviewItem;
   checked: boolean;
-  onCycle: () => void;
+  onSelect: (value: number | null) => void;
 }) {
-  const base =
-    'inline-flex items-center gap-0.5 shrink-0 min-h-11 px-2 -my-2 rounded-md border text-[11px] font-semibold tabular-nums transition-colors active:scale-[0.97]';
-
-  if (item.rate === null) {
-    return (
-      <button
-        type="button"
-        onClick={onCycle}
-        aria-label={`${item.name}の税率: 税なし（タップで変更）`}
-        className={`${base} ${
-          checked
-            ? 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100'
-            : 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100'
-        }`}
-      >
-        税なし
-        <span className="text-[9px] opacity-50" aria-hidden>
-          ⇄
-        </span>
-      </button>
-    );
-  }
-
-  const pct = Math.round(item.rate * 100);
-  const reduced = item.rate === REDUCED;
-  const tone = !checked
-    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100'
-    : reduced
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-      : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200';
+  const options: { value: number | null; label: string; aria: string }[] = [
+    { value: null, label: 'なし', aria: `${item.name}を税なしにする` },
+    { value: REDUCED, label: '8%', aria: `${item.name}を8%にする` },
+    { value: STANDARD, label: '10%', aria: `${item.name}を10%にする` },
+  ];
 
   return (
-    <button
-      type="button"
-      onClick={onCycle}
-      aria-label={`${item.name}の税率: ${pct}%（タップで変更）`}
-      className={`${base} ${tone}`}
+    <div
+      role="group"
+      aria-label={`${item.name}の税率`}
+      className={`inline-flex shrink-0 min-w-[7.5rem] rounded-lg border p-0.5 gap-0.5 ${
+        checked ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50 opacity-50'
+      }`}
     >
-      {pct}%
-      <span className="text-[9px] opacity-50" aria-hidden>
-        ⇄
-      </span>
-    </button>
+      {options.map((opt) => {
+        const pressed = item.rate === opt.value;
+        return (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => onSelect(opt.value)}
+            aria-label={opt.aria}
+            aria-pressed={pressed}
+            className={`flex-1 min-h-11 rounded-md text-[11px] font-semibold tabular-nums transition-colors ${
+              pressed
+                ? 'bg-slate-900 text-white'
+                : 'bg-transparent text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

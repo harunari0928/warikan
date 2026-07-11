@@ -45,7 +45,7 @@ FAB「＋」→「レシートを撮影」でカメラ起動 → 画像を `POST
 
 - リクエスト: `{ image: dataURL, filename?: string }`。クライアントは canvas で長辺1500pxへ縮小・JPEG化して送る（`resizeImageToDataUrl`）。`filename` は現状サーバでは未使用。
 - レスポンス: `{ store, items: [{ name, amount }] }`。`amount` は印字金額の整数円。明細が1件も取れないときだけ 422 `レシートから明細を読み取れませんでした` を返す。ユーザがチェックで取捨選択し、選んだ品目を既存の `POST /api/months/:yyyymm/expenses` に1件ずつ登録する（新規書き込みAPIは増やさない）。
-- **確認ダイアログで消費税を選ぶ**（`ReceiptScanDialog.tsx`）。税率ボタンはタップで **未選択(読取値のまま) → 8% → 10% → 未選択** と循環する。未選択のあいだは読み取った金額をそのまま使い、8%/10% を選ぶと不変の `baseAmount` から `round(baseAmount * (1+rate))` で税込金額を計算する。税率未選択でも追加できる（税込表示のレシートや課税でない行はそのまま登録）。
+- **確認ダイアログで消費税を選ぶ**（`ReceiptScanDialog.tsx`）。各明細行に `なし / 8% / 10%` の3チップのセグメントコントロール（`TaxRateSegment`）を置き、ユーザが直接選択する。循環トグルではなく直接選択で、`role="group"`＋各チップ `aria-pressed`、選択中=slate-900/white と塗り分けて色だけに依存しない。`なし`（＝読取値のまま）のあいだは読み取った金額をそのまま使い、`8%`/`10%` を選ぶと不変の `baseAmount` から `round(baseAmount * (1+rate))` で税込金額を計算する。`なし` のまま追加もできる（税込表示のレシートや課税でない行はそのまま登録）。
 - 実装は `packages/web/src/server/routes/ocr.ts`。OpenAI SDK は使わず標準 `fetch` で REST を叩く（依存追加・Docker build への影響なし）。
 - **テスト/スタブ**: `NODE_ENV!=='production'` かつ `OPENAI_API_KEY` 未設定なら OpenAI を呼ばず決定論的フィクスチャ（牛乳200/食パン150/台所用洗剤300円）を返す。CI はキー不要。
 
