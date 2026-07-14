@@ -245,7 +245,7 @@ export default function App() {
         }}
       />
 
-      <main className="px-4 py-4 space-y-4 pb-32 max-w-2xl mx-auto">
+      <main className="px-4 py-4 space-y-4 pb-40 max-w-2xl mx-auto">
         {loading && !snapshot ? (
           <div className="text-center text-slate-500 dark:text-slate-400 py-12 text-sm">読み込み中…</div>
         ) : error ? (
@@ -268,14 +268,6 @@ export default function App() {
               }}
               onDelete={handleDeleteExpense}
             />
-            <div className="flex justify-center pt-2">
-              <CloseMonthButton
-                yearMonth={yearMonth}
-                closed={isClosed}
-                onClose={handleClose}
-                onOpen={handleOpen}
-              />
-            </div>
             {users.length < 2 ? (
               <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-200 text-sm p-3">
                 ユーザーが2人未満です。設定からユーザーを追加してください（妻と夫の2人で利用します）。
@@ -285,11 +277,37 @@ export default function App() {
         ) : null}
       </main>
 
+      {snapshot ? (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 30,
+            paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
+          }}
+          className="flex justify-center pt-3 px-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800"
+        >
+          <CloseMonthButton
+            yearMonth={yearMonth}
+            closed={isClosed}
+            onClose={handleClose}
+            onOpen={handleOpen}
+          />
+        </div>
+      ) : null}
+
       {!isClosed && currentUserId !== null ? (
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          style={{ position: 'fixed', right: '1rem', bottom: '1.5rem', zIndex: 40 }}
+          style={{
+            position: 'fixed',
+            right: '1rem',
+            bottom: 'calc(5.25rem + env(safe-area-inset-bottom))',
+            zIndex: 40,
+          }}
           className="h-14 w-14 rounded-full bg-slate-900 text-white text-3xl leading-none shadow-lg hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           aria-label="支出を追加"
         >
