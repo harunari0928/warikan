@@ -8,6 +8,7 @@ test-results/
 playwright-report/
 .env
 .env.local
+docker-compose.override.yml
 *.log
 .DS_Store
 
