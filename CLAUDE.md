@@ -6,7 +6,8 @@ Google スプレッドシートで運用していた割勘精算ワークフロ�
 
 - `shared/` — 共有ユーティリティ（日付・割勘ロジック）。`@warikan/shared` として publish。
 - `packages/web/` — React 19 + Vite フロントエンド + Express.js バックエンド、SQLite (better-sqlite3)。
-- `tests/` — Playwright E2E（割勘ロジック、支出CRUD、月の締め、固定費自動投入、ユーザ切替、レシートOCR）。
+- `packages/cli/` — 支出をコマンドで追加・一覧する CLI（`wk`）。Web API 経由。
+- `tests/` — Playwright E2E（割勘ロジック、支出CRUD、月の締め、固定費自動投入、ユーザ切替、レシートOCR、CLI）。
 - `scripts/` — 初期セットアップ（妻/夫ユーザと固定費テンプレ投入）。
 
 ## Domain model
@@ -49,6 +50,27 @@ FAB「＋」→「レシートを撮影」でカメラ起動 → 画像を `POST
 - 実装は `packages/web/src/server/routes/ocr.ts`。OpenAI SDK は使わず標準 `fetch` で REST を叩く（依存追加・Docker build への影響なし）。
 - **テスト/スタブ**: `NODE_ENV!=='production'` かつ `OPENAI_API_KEY` 未設定なら OpenAI を呼ばず決定論的フィクスチャ（牛乳200/食パン150/台所用洗剤300円）を返す。CI はキー不要。
 
+## CLI
+
+支出をコマンドから登録する。`packages/cli/`（`commander`、bin 名 `wk`）。
+
+```bash
+# 追加（-w は wife|husband|妻|夫、-m 省略時は当月、-n はメモ）
+node packages/cli/dist/index.js add -w husband -t "ガス代" -p 3000
+node packages/cli/dist/index.js add -w wife -t "スーパー" -p 4280 -n "週末まとめ買い" -m 2026-06
+
+# 一覧（-w / -m でフィルタ）
+node packages/cli/dist/index.js list
+node packages/cli/dist/index.js list -w husband
+```
+
+- **DB を直接触らず Web API 経由**。`GET /api/months/:yyyymm` で月のレコード作成と固定費自動投入を画面と同じ経路で行い、既存の `POST /api/months/:yyyymm/expenses` に登録する（**新規書き込みAPIは増やさない**）。締め済み・未来月のガードもサーバ側の既存ロジックがそのまま効く。
+- `-w` の英語エイリアス（`wife`/`w`→妻、`husband`/`h`→夫）は `packages/cli/src/api.ts` の `USER_ALIASES` で `users.name` に解決する。見つからなければ登録済みユーザ名を並べてエラーにする。
+- サーバ内部の英語エラー文言（`month is closed` 等）は `ERROR_MESSAGES` で日本語に置き換えて表示する。
+- 接続先は `WEB_URL`（デフォルト `http://localhost:3120`）。
+- Claude Code からは `.claude/skills/expense-add` / `expense-list` スキルで呼ぶ。
+- CLI は Docker イメージに含めない（`packages/web/Dockerfile` は `shared/` と `packages/web/` だけをコピーする）。
+
 ## Development
 
 ```bash
@@ -69,8 +91,9 @@ API_PORT=3110 pnpm --filter web exec vite --port 5180
 ローカルビルド:
 
 ```bash
-pnpm --filter shared build   # 先にshared
-pnpm --filter web build      # vite (client) + tsc (server)
+pnpm --filter shared build       # 先にshared
+pnpm --filter web build          # vite (client) + tsc (server)
+pnpm --filter @warikan/cli build # tsc
 ```
 
 ## Testing
@@ -79,6 +102,7 @@ pnpm --filter web build      # vite (client) + tsc (server)
 npx playwright test                              # 全テスト
 npx playwright test tests/settlement.spec.ts     # 割勘ロジック単体
 npx playwright test tests/close-month.spec.ts    # 月の締めE2E
+npx playwright test tests/cli-expense.spec.ts    # CLI（支出の追加・一覧）
 ```
 
 - Playwright は Express API を `:3121`、Vite を `:5184` で起動。
