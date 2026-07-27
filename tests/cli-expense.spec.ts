@@ -5,6 +5,8 @@ import { resetDb, seedUsers, setIncome, closeMonth, TEST_MONTH } from './helpers
 
 const execAsync = promisify(exec);
 
+const EMPTY_EXPENSES = '今月の支出はまだありません';
+
 function shiftMonth(yyyymm: string, delta: number): string {
   const [y, m] = yyyymm.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
@@ -37,139 +39,158 @@ test.describe('コマンドで支出を追加する', () => {
     });
   });
 
-  test('追加した支出が指定したユーザの明細に表示される', async ({ page }) => {
+  test('追加した品目と金額がコマンドの結果に表示される', async () => {
     // Act
     const result = await runCli('add -w husband -t "ガス代" -p 3000');
 
     // Assert
-    await test.step('追加した内容がコマンドの結果に表示される', async () => {
-      expect(result.stdout).toContain('夫');
-      expect(result.stdout).toContain('ガス代');
-      expect(result.stdout).toContain('¥3,000');
-    });
-
-    await page.goto('/');
-    await page.getByRole('tab', { name: '夫' }).click();
-
-    await test.step('指定したユーザの明細に金額付きで表示される', async () => {
-      await expect(page.getByRole('button', { name: /ガス代.*¥3,000/ })).toBeVisible();
-    });
-
-    await page.getByRole('tab', { name: '妻' }).click();
-
-    await test.step('指定していないユーザの明細には表示されない', async () => {
-      await expect(page.getByRole('button', { name: /ガス代/ })).toBeHidden();
-    });
+    expect(result.stdout).toMatch(/夫: ガス代 ¥3,000/);
   });
 
-  test.describe('ユーザの指定方法', () => {
+  test.describe('支出を追加するユーザの指定', () => {
     for (const { option, expected } of [
       { option: 'wife', expected: '妻' },
       { option: 'husband', expected: '夫' },
       { option: '妻', expected: '妻' },
       { option: '夫', expected: '夫' },
     ]) {
-      test(`「${option}」を指定するとそのユーザの支出として追加される`, async ({ page }) => {
+      test(`「${option}」を指定するとそのユーザの明細に表示される`, async ({ page }) => {
         // Act
-        const result = await runCli(`add -w ${option} -t "日用品" -p 1200`);
-
-        // Assert
-        await test.step('指定したユーザ名がコマンドの結果に表示される', async () => {
-          expect(result.stdout).toContain(expected);
-        });
-
+        await runCli(`add -w ${option} -t "日用品" -p 1200`);
         await page.goto('/');
         await page.getByRole('tab', { name: expected }).click();
 
-        await test.step('そのユーザの明細に表示される', async () => {
-          await expect(page.getByRole('button', { name: /日用品/ })).toBeVisible();
-        });
+        // Assert
+        await expect(page.getByRole('button', { name: /日用品/ })).toBeVisible();
       });
     }
+
+    test('指定していないユーザの明細には表示されない', async ({ page }) => {
+      // Act
+      await runCli('add -w husband -t "ガス代" -p 3000');
+      await page.goto('/');
+      await page.getByRole('tab', { name: '妻' }).click();
+      await page.getByText(EMPTY_EXPENSES).waitFor();
+
+      // Assert
+      await expect(page.getByRole('button', { name: /ガス代/ })).toBeHidden();
+    });
+  });
+
+  test('追加した金額が明細に表示される', async ({ page }) => {
+    // Act
+    await runCli('add -w husband -t "ガス代" -p 3000');
+    await page.goto('/');
+    await page.getByRole('tab', { name: '夫' }).click();
+
+    // Assert
+    await expect(page.getByRole('button', { name: /ガス代.*¥3,000/ })).toBeVisible();
   });
 
   test('メモを付けて追加すると明細にメモが表示される', async ({ page }) => {
     // Act
     await runCli('add -w wife -t "スーパー" -p 4280 -n "週末まとめ買い"');
+    await page.goto('/');
 
     // Assert
-    await page.goto('/');
     await expect(page.getByRole('button', { name: /週末まとめ買い/ })).toBeVisible();
   });
 
-  test('追加した支出が精算結果に反映される', async ({ page, request }) => {
-    // Arrange: 妻30万 / 夫40万 の手取りを登録する
-    await setIncome(request, TEST_MONTH, users.wife, 300000);
-    await setIncome(request, TEST_MONTH, users.husband, 400000);
+  test.describe('追加した支出の精算への反映', () => {
+    test('送金の向きが精算結果に表示される', async ({ page, request }) => {
+      // Arrange: 妻30万 / 夫40万 の手取りを登録する
+      await setIncome(request, TEST_MONTH, users.wife, 300000);
+      await setIncome(request, TEST_MONTH, users.husband, 400000);
 
-    // Act
-    await runCli('add -w wife -t "家賃" -p 120000');
+      // Act
+      await runCli('add -w wife -t "家賃" -p 120000');
+      await page.goto('/');
 
-    // Assert
-    await page.goto('/');
-
-    await test.step('送金の向きが精算結果に表示される', async () => {
+      // Assert
       await expect(page.getByText('夫 → 妻')).toBeVisible();
     });
-    await test.step('送金額が精算結果に表示される', async () => {
+
+    test('送金額が精算結果に表示される', async ({ page, request }) => {
+      // Arrange: 妻30万 / 夫40万 の手取りを登録する
+      await setIncome(request, TEST_MONTH, users.wife, 300000);
+      await setIncome(request, TEST_MONTH, users.husband, 400000);
+
+      // Act
+      await runCli('add -w wife -t "家賃" -p 120000');
+      await page.goto('/');
+
+      // Assert
       await expect(
         page.getByRole('region', { name: '月次サマリー' }).getByText('¥110,000'),
       ).toBeVisible();
     });
   });
 
-  test('対象の月を指定して追加すると、その月の明細に入る', async ({ page }) => {
-    // Act
-    await runCli(`add -w husband -t "先月の電気代" -p 8000 -m ${shiftMonth(TEST_MONTH, -1)}`);
+  test.describe('対象の月の指定', () => {
+    test('指定した月の明細に表示される', async ({ page }) => {
+      // Act
+      await runCli(`add -w husband -t "電気代" -p 8000 -m ${shiftMonth(TEST_MONTH, -1)}`);
+      await page.goto('/');
+      await page.getByRole('tab', { name: '夫' }).click();
+      await page.getByRole('button', { name: '前の月' }).click();
 
-    // Arrange: 夫の明細を当月で開く
-    await page.goto('/');
-    await page.getByRole('tab', { name: '夫' }).click();
-
-    // Assert
-    await test.step('当月の明細には表示されない', async () => {
-      await expect(page.getByRole('button', { name: /先月の電気代/ })).toBeHidden();
+      // Assert
+      await expect(page.getByRole('button', { name: /電気代/ })).toBeVisible();
     });
 
-    // Act
-    await page.getByRole('button', { name: '前の月' }).click();
+    test('指定した月以外の明細には表示されない', async ({ page }) => {
+      // Act
+      await runCli(`add -w husband -t "電気代" -p 8000 -m ${shiftMonth(TEST_MONTH, -1)}`);
+      await page.goto('/');
+      await page.getByRole('tab', { name: '夫' }).click();
+      await page.getByText(EMPTY_EXPENSES).waitFor();
 
-    // Assert
-    await test.step('前の月に切り替えると明細に表示される', async () => {
-      await expect(page.getByRole('button', { name: /先月の電気代/ })).toBeVisible();
+      // Assert
+      await expect(page.getByRole('button', { name: /電気代/ })).toBeHidden();
     });
   });
 
-  test('締め済みの月には追加できない', async ({ request, page }) => {
-    // Arrange
-    await closeMonth(request, TEST_MONTH);
+  test.describe('締め済みの月への追加', () => {
+    test('締め済みであることが伝わるエラーになる', async ({ request }) => {
+      // Arrange
+      await closeMonth(request, TEST_MONTH);
 
-    // Act
-    const result = await runCli('add -w wife -t "締め後の支出" -p 500');
+      // Act
+      const result = await runCli('add -w wife -t "食費" -p 500');
 
-    // Assert
-    await test.step('締め済みであることが伝わるエラーが表示される', async () => {
+      // Assert
       expect(result.stderr).toContain('締め済み');
     });
 
-    await page.goto('/');
+    test('明細には追加されない', async ({ request, page }) => {
+      // Arrange
+      await closeMonth(request, TEST_MONTH);
 
-    await test.step('明細には追加されない', async () => {
-      await expect(page.getByRole('button', { name: /締め後の支出/ })).toBeHidden();
+      // Act
+      await runCli('add -w wife -t "食費" -p 500');
+      await page.goto('/');
+      await page.getByText(EMPTY_EXPENSES).waitFor();
+
+      // Assert
+      await expect(page.getByRole('button', { name: /食費/ })).toBeHidden();
     });
   });
 
-  test('登録されていないユーザを指定すると登録済みユーザを示すエラーになる', async () => {
-    // Act
-    const result = await runCli('add -w child -t "おやつ" -p 300');
+  test.describe('登録されていないユーザの指定', () => {
+    test('指定したユーザが見つからないことが伝わる', async () => {
+      // Act
+      const result = await runCli('add -w child -t "おやつ" -p 300');
 
-    // Assert
-    await test.step('指定したユーザが見つからないことが伝わる', async () => {
+      // Assert
       expect(result.stderr).toContain('見つかりません');
     });
-    await test.step('登録されているユーザ名が示される', async () => {
-      expect(result.stderr).toContain('妻');
-      expect(result.stderr).toContain('夫');
+
+    test('登録されているユーザ名が示される', async () => {
+      // Act
+      const result = await runCli('add -w child -t "おやつ" -p 300');
+
+      // Assert
+      expect(result.stderr).toMatch(/登録されているユーザ: .*妻.*夫/);
     });
   });
 
@@ -196,46 +217,61 @@ test.describe('コマンドで支出を一覧する', () => {
     await seedUsers(request);
   });
 
-  test('追加した支出と合計金額が一覧に表示される', async () => {
-    // Arrange
-    await runCli('add -w husband -t "ガス代" -p 3000');
-    await runCli('add -w wife -t "スーパー" -p 4280');
+  test.describe('一覧の内容', () => {
+    test('妻と夫の両方の支出が並ぶ', async () => {
+      // Arrange
+      await runCli('add -w husband -t "ガス代" -p 3000');
+      await runCli('add -w wife -t "スーパー" -p 4280');
 
-    // Act
-    const result = await runCli('list');
+      // Act
+      const result = await runCli('list');
 
-    // Assert
-    await test.step('両者の支出が表示される', async () => {
+      // Assert
       expect(result.stdout).toContain('ガス代');
       expect(result.stdout).toContain('スーパー');
     });
-    await test.step('合計金額が表示される', async () => {
-      expect(result.stdout).toContain('¥7,280');
+
+    test('合計金額が表示される', async () => {
+      // Arrange
+      await runCli('add -w husband -t "ガス代" -p 3000');
+      await runCli('add -w wife -t "スーパー" -p 4280');
+
+      // Act
+      const result = await runCli('list');
+
+      // Assert
+      expect(result.stdout).toContain('合計: ¥7,280');
+    });
+
+    test('支出がない月は支出がないことが伝わる', async () => {
+      // Act
+      const result = await runCli('list');
+
+      // Assert
+      expect(result.stdout).toContain('支出はありません');
     });
   });
 
-  test('ユーザを指定するとそのユーザの支出だけ表示される', async () => {
-    // Arrange
-    await runCli('add -w husband -t "ガス代" -p 3000');
-    await runCli('add -w wife -t "スーパー" -p 4280');
+  test.describe('ユーザで絞り込む', () => {
+    test.beforeEach(async () => {
+      await runCli('add -w husband -t "ガス代" -p 3000');
+      await runCli('add -w wife -t "スーパー" -p 4280');
+    });
 
-    // Act
-    const result = await runCli('list -w husband');
+    test('指定したユーザの支出が表示される', async () => {
+      // Act
+      const result = await runCli('list -w husband');
 
-    // Assert
-    await test.step('指定したユーザの支出が表示される', async () => {
+      // Assert
       expect(result.stdout).toContain('ガス代');
     });
-    await test.step('指定していないユーザの支出は表示されない', async () => {
+
+    test('指定していないユーザの支出は表示されない', async () => {
+      // Act
+      const result = await runCli('list -w husband');
+
+      // Assert
       expect(result.stdout).not.toContain('スーパー');
     });
-  });
-
-  test('支出がない月は支出がないことが伝わる', async () => {
-    // Act
-    const result = await runCli('list');
-
-    // Assert
-    expect(result.stdout).toContain('支出はありません');
   });
 });
