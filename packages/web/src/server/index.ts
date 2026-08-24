@@ -8,6 +8,7 @@ import usersRouter from './routes/users.js';
 import monthsRouter from './routes/months.js';
 import fixedTemplatesRouter from './routes/fixed-templates.js';
 import ocrRouter from './routes/ocr.js';
+import publicRouter from './routes/public.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +25,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/months', monthsRouter);
 app.use('/api/fixed-expense-templates', fixedTemplatesRouter);
 app.use('/api/ocr', ocrRouter);
+app.use('/api/public', publicRouter);
 
 if (process.env.NODE_ENV !== 'production') {
   app.post('/api/test/reset', (_req: Request, res: Response) => {
