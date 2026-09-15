@@ -2,7 +2,10 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 
 const router: ReturnType<typeof Router> = Router();
 
-const MODEL = 'gpt-5.4-mini';
+const MODEL = 'gpt-5.6-luna';
+// レシートの品目行は印字された文字と金額をそのまま書き起こすだけで推論の余地がないため、
+// reasoning は none にしてレイテンシとコストを抑える。
+const REASONING_EFFORT = 'none';
 
 // AI は品目名と「レシートに印字された金額」だけを読み取る。
 // 税率の判定はしない（軽減/標準の判断は精度が出ないため、ユーザが画面で選ぶ）。
@@ -61,6 +64,7 @@ function stubResult(): OcrParsed {
 async function callOpenAI(apiKey: string, imageDataUrl: string): Promise<OcrParsed> {
   const payload = {
     model: MODEL,
+    reasoning_effort: REASONING_EFFORT,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       {

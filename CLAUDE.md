@@ -39,7 +39,7 @@ x = (A + Q - B - P) / 2
 
 ## レシートOCR
 
-FAB「＋」→「レシートを撮影」でカメラ起動 → 画像を `POST /api/ocr/receipt` に送信し、OpenAI `gpt-5.4-mini`（画像 + Structured Outputs）で明細を抽出する。
+FAB「＋」→「レシートを撮影」でカメラ起動 → 画像を `POST /api/ocr/receipt` に送信し、OpenAI `gpt-5.6-luna`（画像 + Structured Outputs）で明細を抽出する。推論の余地がないタスクなので `reasoning_effort` は `none`。
 
 **税率はAIに判定させない**（軽減/標準の判定・税抜/税込の換算は精度が出ないため）。AIは品目名と**レシートに印字された金額をそのまま**読み取るだけ。消費税は確認ダイアログでユーザが品目ごとにボタンで選ぶ。
 
