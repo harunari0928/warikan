@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 
 const router: ReturnType<typeof Router> = Router();
 
-const MODEL = 'gpt-5.4-mini';
+const MODEL = 'gpt-6-luna';
 
 // AI は品目名と「レシートに印字された金額」だけを読み取る。
 // 税率の判定はしない（軽減/標準の判断は精度が出ないため、ユーザが画面で選ぶ）。
