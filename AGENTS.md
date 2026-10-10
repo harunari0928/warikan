@@ -110,7 +110,7 @@ npx playwright test tests/cli-expense.spec.ts    # CLI（支出の追加・一�
 - 各テストは `POST /api/test/reset` で DB をクリーンにしてから実行。
 - `data/test_warikan.db` を使用。
 
-テスト作成時の方針・規約は [`tests/CLAUDE.md`](tests/CLAUDE.md) を参照（household-tasks と同じユーザ目線の規約を共有）。
+テスト作成時の方針・規約は [`tests/AGENTS.md`](tests/AGENTS.md) を参照（household-tasks と同じユーザ目線の規約を共有）。
 
 ## Deployment
 
